@@ -1,8 +1,8 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from backend.app.models import TransactionType
+from backend.app.models import TransactionKind, TransactionType
 
 
 class TransactionCreate(BaseModel):
@@ -16,9 +16,65 @@ class TransactionCreate(BaseModel):
 
 class TransactionRead(TransactionCreate):
     id: int
+    kind: TransactionKind
+    included_in_analytics: bool
+    merchant: str | None
+    bank_category: str | None
+    mcc: str | None
+    status: str
     created_at: datetime
+    updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class TransactionUpdate(BaseModel):
+    occurred_on: date | None = None
+    amount_cents: int | None = Field(default=None, gt=0)
+    category: str | None = Field(default=None, min_length=1, max_length=100)
+    comment: str | None = Field(default=None, max_length=255)
+    source: str | None = Field(default=None, min_length=1, max_length=100)
+
+    @model_validator(mode="after")
+    def require_change(self) -> "TransactionUpdate":
+        if not self.model_fields_set:
+            raise ValueError("Укажите хотя бы одно поле для изменения")
+        return self
+
+
+class CategoryTotal(BaseModel):
+    category: str
+    amount_cents: int
+
+
+class StatisticsRead(BaseModel):
+    month: str
+    expenses: list[CategoryTotal]
+    incomes: list[CategoryTotal]
+    expense_total_cents: int
+    income_total_cents: int
+    balance_cents: int
+
+
+class MonthRead(BaseModel):
+    value: str
+    label: str
+
+
+class ImportRead(BaseModel):
+    id: int
+    filename: str
+    total_rows: int
+    imported_rows: int
+    duplicate_rows: int
+    excluded_rows: int
+    error_rows: int
+    month: str | None
+
+
+class CategoriesRead(BaseModel):
+    expense: list[str]
+    income: list[str]
 
 
 class HealthRead(BaseModel):

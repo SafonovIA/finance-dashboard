@@ -1,17 +1,77 @@
+from __future__ import annotations
+
+from calendar import monthrange
+from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from backend.app.database import engine, get_session
-from backend.app.models import Transaction
-from backend.app.schemas import HealthRead, TransactionCreate, TransactionRead
+from backend.app.importer import (
+    EXPENSE_CATEGORIES,
+    INCOME_CATEGORIES,
+    ImportFormatError,
+    merchant_key,
+    parse_transaction,
+    read_excel_rows,
+)
+from backend.app.models import CategoryRule, ImportBatch, Transaction, TransactionKind, TransactionType
+from backend.app.schemas import (
+    CategoriesRead,
+    CategoryTotal,
+    HealthRead,
+    ImportRead,
+    MonthRead,
+    StatisticsRead,
+    TransactionCreate,
+    TransactionRead,
+    TransactionUpdate,
+)
 
 
 router = APIRouter(prefix="/api")
 SessionDependency = Annotated[Session, Depends(get_session)]
+MAX_UPLOAD_BYTES = 15 * 1024 * 1024
+MONTH_NAMES = (
+    "Январь",
+    "Февраль",
+    "Март",
+    "Апрель",
+    "Май",
+    "Июнь",
+    "Июль",
+    "Август",
+    "Сентябрь",
+    "Октябрь",
+    "Ноябрь",
+    "Декабрь",
+)
+
+
+def month_bounds(month: str) -> tuple[date, date]:
+    try:
+        year_text, month_text = month.split("-", maxsplit=1)
+        year, month_number = int(year_text), int(month_text)
+        start = date(year, month_number, 1)
+    except (TypeError, ValueError) as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Месяц должен быть указан в формате YYYY-MM",
+        ) from error
+    end = date(year, month_number, monthrange(year, month_number)[1])
+    return start, end
+
+
+def validate_category(transaction_type: TransactionType, category: str) -> None:
+    allowed = EXPENSE_CATEGORIES if transaction_type == TransactionType.expense else INCOME_CATEGORIES
+    if category not in allowed:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Недопустимая категория для типа {transaction_type.value}",
+        )
 
 
 @router.get("/health", response_model=HealthRead)
@@ -25,11 +85,41 @@ def health() -> HealthRead:
     return HealthRead(status="ok", database="available")
 
 
-@router.get("/transactions", response_model=list[TransactionRead])
-def list_transactions(session: SessionDependency) -> list[Transaction]:
-    statement = select(Transaction).order_by(
-        Transaction.occurred_on.desc(), Transaction.id.desc()
+@router.get("/categories", response_model=CategoriesRead)
+def categories() -> CategoriesRead:
+    return CategoriesRead(expense=EXPENSE_CATEGORIES, income=INCOME_CATEGORIES)
+
+
+@router.get("/months", response_model=list[MonthRead])
+def list_months(session: SessionDependency) -> list[MonthRead]:
+    dates = session.scalars(
+        select(Transaction.occurred_on)
+        .where(Transaction.included_in_analytics.is_(True))
+        .order_by(Transaction.occurred_on.desc())
     )
+    values = sorted({value.strftime("%Y-%m") for value in dates}, reverse=True)
+    return [
+        MonthRead(
+            value=value,
+            label=f"{MONTH_NAMES[int(value[5:7]) - 1]} {value[:4]}",
+        )
+        for value in values
+    ]
+
+
+@router.get("/transactions", response_model=list[TransactionRead])
+def list_transactions(
+    session: SessionDependency,
+    month: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}$"),
+    include_excluded: bool = False,
+) -> list[Transaction]:
+    statement = select(Transaction)
+    if month:
+        start, end = month_bounds(month)
+        statement = statement.where(Transaction.occurred_on.between(start, end))
+    if not include_excluded:
+        statement = statement.where(Transaction.included_in_analytics.is_(True))
+    statement = statement.order_by(Transaction.occurred_on.desc(), Transaction.id.desc())
     return list(session.scalars(statement))
 
 
@@ -41,8 +131,182 @@ def list_transactions(session: SessionDependency) -> list[Transaction]:
 def create_transaction(
     payload: TransactionCreate, session: SessionDependency
 ) -> Transaction:
-    transaction = Transaction(**payload.model_dump())
+    validate_category(payload.type, payload.category)
+    transaction = Transaction(
+        **payload.model_dump(),
+        kind=TransactionKind.manual,
+        included_in_analytics=True,
+        status="Ок",
+    )
     session.add(transaction)
     session.commit()
     session.refresh(transaction)
     return transaction
+
+
+@router.patch("/transactions/{transaction_id}", response_model=TransactionRead)
+def update_transaction(
+    transaction_id: int,
+    payload: TransactionUpdate,
+    session: SessionDependency,
+) -> Transaction:
+    transaction = session.get(Transaction, transaction_id)
+    if transaction is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Операция не найдена")
+
+    changes = payload.model_dump(exclude_unset=True)
+    if "category" in changes:
+        validate_category(transaction.type, changes["category"])
+    for field, value in changes.items():
+        setattr(transaction, field, value)
+
+    if "category" in changes and transaction.merchant:
+        key = merchant_key(transaction.merchant)
+        rule = session.scalar(
+            select(CategoryRule).where(
+                CategoryRule.merchant_key == key,
+                CategoryRule.type == transaction.type,
+            )
+        )
+        if rule is None:
+            session.add(
+                CategoryRule(
+                    merchant_key=key,
+                    type=transaction.type,
+                    category=transaction.category,
+                )
+            )
+        else:
+            rule.category = transaction.category
+
+    session.commit()
+    session.refresh(transaction)
+    return transaction
+
+
+@router.get("/statistics", response_model=StatisticsRead)
+def statistics(
+    session: SessionDependency,
+    month: str = Query(pattern=r"^\d{4}-\d{2}$"),
+) -> StatisticsRead:
+    start, end = month_bounds(month)
+    transactions = session.scalars(
+        select(Transaction).where(
+            Transaction.occurred_on.between(start, end),
+            Transaction.included_in_analytics.is_(True),
+        )
+    )
+
+    expense_totals = {category: 0 for category in EXPENSE_CATEGORIES}
+    income_totals = {category: 0 for category in INCOME_CATEGORIES}
+    for transaction in transactions:
+        if transaction.type == TransactionType.expense:
+            multiplier = -1 if transaction.kind == TransactionKind.refund else 1
+            expense_totals[transaction.category] = expense_totals.get(transaction.category, 0) + multiplier * transaction.amount_cents
+        else:
+            income_totals[transaction.category] = income_totals.get(transaction.category, 0) + transaction.amount_cents
+
+    expenses = [
+        CategoryTotal(category=category, amount_cents=max(0, amount))
+        for category, amount in expense_totals.items()
+    ]
+    incomes = [CategoryTotal(category=category, amount_cents=amount) for category, amount in income_totals.items()]
+    expense_total = sum(item.amount_cents for item in expenses)
+    income_total = sum(item.amount_cents for item in incomes)
+    return StatisticsRead(
+        month=month,
+        expenses=expenses,
+        incomes=incomes,
+        expense_total_cents=expense_total,
+        income_total_cents=income_total,
+        balance_cents=income_total - expense_total,
+    )
+
+
+@router.post(
+    "/imports/excel",
+    response_model=ImportRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def import_excel(
+    session: SessionDependency,
+    file: UploadFile = File(...),
+) -> ImportRead:
+    filename = file.filename or "operations.xlsx"
+    content = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Файл слишком большой. Максимальный размер — 15 МБ",
+        )
+
+    try:
+        records = read_excel_rows(filename, content)
+    except ImportFormatError as error:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Не удалось прочитать Excel-файл",
+        ) from error
+
+    rules = {
+        (rule.merchant_key, rule.type): rule.category
+        for rule in session.scalars(select(CategoryRule))
+    }
+    parsed = []
+    parsing_errors = 0
+    for record in records:
+        try:
+            parsed.append(parse_transaction(record, rules))
+        except ImportFormatError:
+            parsing_errors += 1
+
+    fingerprints = [transaction.fingerprint for transaction in parsed]
+    existing = (
+        set(
+            session.scalars(
+                select(Transaction.fingerprint).where(Transaction.fingerprint.in_(fingerprints))
+            )
+        )
+        if fingerprints
+        else set()
+    )
+    seen: set[str] = set()
+    unique_transactions = []
+    duplicate_rows = 0
+    for transaction in parsed:
+        if transaction.fingerprint in existing or transaction.fingerprint in seen:
+            duplicate_rows += 1
+            continue
+        seen.add(transaction.fingerprint)
+        unique_transactions.append(transaction)
+
+    batch = ImportBatch(
+        filename=filename[:255],
+        total_rows=len(records),
+        imported_rows=len(unique_transactions),
+        duplicate_rows=duplicate_rows,
+        excluded_rows=sum(not transaction.included_in_analytics for transaction in unique_transactions),
+        error_rows=parsing_errors
+        + sum(transaction.kind == TransactionKind.error for transaction in unique_transactions),
+    )
+    session.add(batch)
+    session.flush()
+    for transaction in unique_transactions:
+        session.add(Transaction(**transaction.__dict__, import_batch_id=batch.id))
+    session.commit()
+    session.refresh(batch)
+
+    imported_dates = [transaction.occurred_on for transaction in unique_transactions]
+    latest_month = max(imported_dates).strftime("%Y-%m") if imported_dates else None
+    return ImportRead(
+        id=batch.id,
+        filename=batch.filename,
+        total_rows=batch.total_rows,
+        imported_rows=batch.imported_rows,
+        duplicate_rows=batch.duplicate_rows,
+        excluded_rows=batch.excluded_rows,
+        error_rows=batch.error_rows,
+        month=latest_month,
+    )
