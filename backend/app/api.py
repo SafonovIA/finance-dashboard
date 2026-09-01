@@ -298,7 +298,7 @@ async def import_excel(
     session.commit()
     session.refresh(batch)
 
-    imported_dates = [transaction.occurred_on for transaction in unique_transactions]
+    imported_dates = [transaction.occurred_on for transaction in parsed]
     latest_month = max(imported_dates).strftime("%Y-%m") if imported_dates else None
     return ImportRead(
         id=batch.id,

@@ -78,3 +78,20 @@ input {
 ::selection {
   background: rgba(67, 137, 216, 0.34);
 }
+
+.editor-control {
+  min-height: 2rem;
+  width: 100%;
+  min-width: 7rem;
+  border: 1px solid #294966;
+  border-radius: 0.4rem;
+  background: #091522;
+  padding: 0.3rem 0.45rem;
+  color: #eaf2f9;
+  outline: none;
+}
+
+.editor-control:focus {
+  border-color: #4389d8;
+  box-shadow: 0 0 0 2px rgba(67, 137, 216, 0.2);
+}

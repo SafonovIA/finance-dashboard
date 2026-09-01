@@ -11,6 +11,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { MonthProvider, useMonth } from '@/components/month-context';
 
 const navigation = [
   { href: '/', label: 'Статистика', icon: BarChart3 },
@@ -24,9 +25,10 @@ const titles: Record<string, string> = {
   '/upload': 'Загрузка файла',
 };
 
-export function DashboardShell({ children }: { children: React.ReactNode }) {
+function DashboardContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const showMonth = pathname !== '/upload';
+  const { months, selectedMonth, setSelectedMonth, loading } = useMonth();
 
   return (
     <div className="min-h-screen bg-background text-foreground md:grid md:grid-cols-[196px_minmax(0,1fr)]">
@@ -82,9 +84,16 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 <span className="sr-only">Выберите месяц</span>
                 <select
                   className="h-9 appearance-none rounded-lg border border-[#14263a] bg-[#0b1724] py-0 pr-8 pl-3 text-xs text-[#8b9bad] outline-none focus:border-[#315f8d] focus:ring-2 focus:ring-[#4389d8]/20"
-                  defaultValue="may-2024"
+                  value={selectedMonth}
+                  disabled={loading || months.length === 0}
+                  onChange={(event) => setSelectedMonth(event.target.value)}
                 >
-                  <option value="may-2024">Май 2024</option>
+                  {months.length === 0 ? <option value="">Нет данных</option> : null}
+                  {months.map((month) => (
+                    <option key={month.value} value={month.value}>
+                      {month.label}
+                    </option>
+                  ))}
                 </select>
                 <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 size-3 -translate-y-1/2" aria-hidden="true" />
               </label>
@@ -94,5 +103,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <div className="mx-auto w-full max-w-[1180px] p-5 sm:p-8">{children}</div>
       </main>
     </div>
+  );
+}
+
+export function DashboardShell({ children }: { children: React.ReactNode }) {
+  return (
+    <MonthProvider>
+      <DashboardContent>{children}</DashboardContent>
+    </MonthProvider>
   );
 }
