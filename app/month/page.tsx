@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowUpDown, Check, ChevronDown, ChevronUp, Pencil, Trash2, X } from 'lucide-react';
 import { useMonth } from '@/components/month-context';
+import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatCurrency, requestJson, type Account, type Categories, type Category, type MonthDeleteResult, type Transaction, type TransactionType } from '@/lib/api';
 
@@ -125,8 +126,8 @@ export default function MonthPage() {
           {deletingMonth ? 'Удаляем…' : 'Удалить данные за месяц'}
         </button>
       </div>
-      <TransactionsTable title="Расходы" rows={expenses} accounts={accounts} categories={categories.expense} tone="expense" onUpdated={handleUpdated} onDeleted={handleDeleted} />
-      <TransactionsTable title="Доходы" rows={incomes} accounts={accounts} categories={categories.income} tone="income" onUpdated={handleUpdated} onDeleted={handleDeleted} />
+      <TransactionsTable key={`${selectedMonth}-expense`} title="Расходы" rows={expenses} accounts={accounts} categories={categories.expense} tone="expense" onUpdated={handleUpdated} onDeleted={handleDeleted} />
+      <TransactionsTable key={`${selectedMonth}-income`} title="Доходы" rows={incomes} accounts={accounts} categories={categories.income} tone="income" onUpdated={handleUpdated} onDeleted={handleDeleted} />
     </div>
   );
 }
@@ -154,12 +155,29 @@ function TransactionsTable({
   const [error, setError] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>('occurred_on');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [dateFilter, setDateFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [commentFilter, setCommentFilter] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('');
   const toneClass = tone === 'expense' ? 'text-[#f26868]' : 'text-[#63c978]';
-  const total = rows.reduce(
+  const sourceOptions = useMemo(
+    () => [...new Set(rows.map((transaction) => transaction.source))].sort((left, right) => textCollator.compare(left, right)),
+    [rows],
+  );
+  const filteredRows = useMemo(() => {
+    const commentQuery = commentFilter.trim().toLocaleLowerCase('ru');
+    return rows.filter((transaction) => (
+      (!dateFilter || transaction.occurred_on === dateFilter)
+      && (!categoryFilter || transaction.category === categoryFilter)
+      && (!sourceFilter || transaction.source === sourceFilter)
+      && (!commentQuery || (transaction.comment ?? '').toLocaleLowerCase('ru').includes(commentQuery))
+    ));
+  }, [categoryFilter, commentFilter, dateFilter, rows, sourceFilter]);
+  const total = filteredRows.reduce(
     (sum, transaction) => sum + (transaction.kind === 'refund' ? -transaction.amount_cents : transaction.amount_cents),
     0,
   );
-  const sortedRows = useMemo(() => [...rows].sort((left, right) => {
+  const sortedRows = useMemo(() => [...filteredRows].sort((left, right) => {
     let comparison: number;
     if (sortKey === 'amount_cents') {
       const leftAmount = left.kind === 'refund' ? -left.amount_cents : left.amount_cents;
@@ -172,7 +190,8 @@ function TransactionsTable({
     }
     if (comparison === 0) return left.id - right.id;
     return sortDirection === 'asc' ? comparison : -comparison;
-  }), [rows, sortDirection, sortKey]);
+  }), [filteredRows, sortDirection, sortKey]);
+  const hasActiveFilters = Boolean(dateFilter || categoryFilter || commentFilter.trim() || sourceFilter);
 
   const changeSort = (key: SortKey) => {
     if (key === sortKey) {
@@ -181,6 +200,13 @@ function TransactionsTable({
     }
     setSortKey(key);
     setSortDirection('asc');
+  };
+
+  const clearFilters = () => {
+    setDateFilter('');
+    setCategoryFilter('');
+    setCommentFilter('');
+    setSourceFilter('');
   };
 
   const startEditing = (transaction: Transaction) => {
@@ -248,7 +274,7 @@ function TransactionsTable({
     <section className="rounded-xl border border-[#15283b] bg-card p-4 sm:p-5">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className={`text-sm font-semibold ${toneClass}`}>{title}</h2>
-        <span className="text-[13px] text-[#718398]">Нажмите заголовок столбца для сортировки</span>
+        <span className="text-[13px] text-[#718398]">Показано {filteredRows.length} из {rows.length} · заголовки сортируют</span>
       </div>
       {error ? <p className="mb-3 rounded-md bg-[#2b1720] px-3 py-2 text-xs text-[#ff9ca8]">{error}</p> : null}
       <Table className="min-w-[1035px] text-[14px]">
@@ -268,11 +294,39 @@ function TransactionsTable({
             })}
             <TableHead className="h-8 px-2 text-[13px] font-medium text-[#91a0b1]"><span className="sr-only">Действия</span></TableHead>
           </TableRow>
+          <TableRow className="border-[#17293c] bg-[#0a1725] hover:bg-[#0a1725]">
+            <TableHead className="h-auto px-2 py-2">
+              <label className="sr-only" htmlFor={`${tone}-date-filter`}>Фильтр по дате</label>
+              <Input id={`${tone}-date-filter`} type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} className="h-8 min-w-[10rem] border-[#24405d] bg-[#091522] px-2 text-xs text-[#bcc8d5]" />
+            </TableHead>
+            <TableHead className="h-auto px-2 py-2"><span className="sr-only">Фильтр по сумме не задан</span></TableHead>
+            <TableHead className="h-auto px-2 py-2">
+              <label className="sr-only" htmlFor={`${tone}-category-filter`}>Фильтр по категории</label>
+              <select id={`${tone}-category-filter`} value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="h-8 w-full min-w-[10rem] rounded-lg border border-[#24405d] bg-[#091522] px-2 text-xs text-[#bcc8d5] outline-none focus:border-[#4389d8]">
+                <option value="">Все категории</option>
+                {categories.map((category) => <option key={category.id} value={category.name}>{category.name}</option>)}
+              </select>
+            </TableHead>
+            <TableHead className="h-auto px-2 py-2">
+              <label className="sr-only" htmlFor={`${tone}-comment-filter`}>Фильтр по комментарию</label>
+              <Input id={`${tone}-comment-filter`} type="search" value={commentFilter} onChange={(event) => setCommentFilter(event.target.value)} placeholder="Найти комментарий" className="h-8 min-w-[13rem] border-[#24405d] bg-[#091522] px-2 text-xs text-[#bcc8d5]" />
+            </TableHead>
+            <TableHead className="h-auto px-2 py-2">
+              <label className="sr-only" htmlFor={`${tone}-source-filter`}>Фильтр по источнику</label>
+              <select id={`${tone}-source-filter`} value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="h-8 w-full min-w-[10rem] rounded-lg border border-[#24405d] bg-[#091522] px-2 text-xs text-[#bcc8d5] outline-none focus:border-[#4389d8]">
+                <option value="">Все источники</option>
+                {sourceOptions.map((source) => <option key={source} value={source}>{source}</option>)}
+              </select>
+            </TableHead>
+            <TableHead className="h-auto px-2 py-2 text-right">
+              <IconButton label="Сбросить фильтры" disabled={!hasActiveFilters} onClick={clearFilters}><X className="size-3.5" /></IconButton>
+            </TableHead>
+          </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.length === 0 ? (
+          {filteredRows.length === 0 ? (
             <TableRow className="border-[#142638] hover:bg-transparent">
-              <TableCell colSpan={6} className="h-20 text-center text-[#718398]">Операций нет</TableCell>
+              <TableCell colSpan={6} className="h-20 text-center text-[#718398]">{rows.length === 0 ? 'Операций нет' : 'По выбранным фильтрам операций нет'}</TableCell>
             </TableRow>
           ) : null}
           {sortedRows.map((transaction) => {
@@ -327,7 +381,7 @@ function TransactionsTable({
         </TableBody>
       </Table>
       <div className={`mt-3 flex items-center justify-between border-t border-[#17293c] px-2 pt-4 text-xs font-semibold ${toneClass}`}>
-        <span>{tone === 'expense' ? 'Итого расходов' : 'Итого доходов'}</span>
+        <span>{hasActiveFilters ? 'Итого по фильтру' : (tone === 'expense' ? 'Итого расходов' : 'Итого доходов')}</span>
         <span className="tabular-nums">{formatCurrency(Math.max(0, total))}</span>
       </div>
     </section>
