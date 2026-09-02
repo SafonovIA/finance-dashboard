@@ -191,8 +191,7 @@ def parse_transaction(
     description = normalize_text(record.get("Описание")) or None
     message = normalize_text(record.get("Сообщение")) or None
     account = normalize_text(record.get("Имя счёта"))
-    card = normalize_text(record.get("Номер карты"))
-    source = normalize_text(f"{account} {card}") or "Не указан"
+    source = account or "Не указан"
     analytics_enabled = merchant_key(record.get("Учёт в аналитике")) == "да"
     is_internal_transfer = merchant_key(description) == "между своими счетами"
 

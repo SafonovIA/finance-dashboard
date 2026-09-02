@@ -5,8 +5,8 @@ from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from sqlalchemy import select, text
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import case, func, select, text, update
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from backend.app.database import engine, get_session
@@ -18,8 +18,11 @@ from backend.app.importer import (
     parse_transaction,
     read_excel_rows,
 )
-from backend.app.models import CategoryRule, ImportBatch, Transaction, TransactionKind, TransactionType
+from backend.app.models import Account, CategoryRule, ImportBatch, Transaction, TransactionKind, TransactionType
 from backend.app.schemas import (
+    AccountCreate,
+    AccountRead,
+    AccountUpdate,
     CategoriesRead,
     CategoryTotal,
     HealthRead,
@@ -74,6 +77,43 @@ def validate_category(transaction_type: TransactionType, category: str) -> None:
         )
 
 
+def normalized_account_name(name: str) -> str:
+    return " ".join(name.split())
+
+
+def get_account(session: Session, account_id: int) -> Account:
+    account = session.get(Account, account_id)
+    if account is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Счёт не найден")
+    return account
+
+
+def find_account_by_name(session: Session, name: str) -> Account | None:
+    return session.scalar(
+        select(Account).where(func.lower(Account.name) == name.casefold())
+    )
+
+
+def account_movement_expression():
+    return case(
+        (Transaction.status != "Ок", 0),
+        (Transaction.kind == TransactionKind.refund, Transaction.amount_cents),
+        (Transaction.type == TransactionType.income, Transaction.amount_cents),
+        else_=-Transaction.amount_cents,
+    )
+
+
+def account_movement(session: Session, account_id: int) -> int:
+    return int(
+        session.scalar(
+            select(func.coalesce(func.sum(account_movement_expression()), 0)).where(
+                Transaction.account_id == account_id
+            )
+        )
+        or 0
+    )
+
+
 @router.get("/health", response_model=HealthRead)
 def health() -> HealthRead:
     try:
@@ -88,6 +128,117 @@ def health() -> HealthRead:
 @router.get("/categories", response_model=CategoriesRead)
 def categories() -> CategoriesRead:
     return CategoriesRead(expense=EXPENSE_CATEGORIES, income=INCOME_CATEGORIES)
+
+
+@router.get("/accounts", response_model=list[AccountRead])
+def list_accounts(session: SessionDependency) -> list[AccountRead]:
+    movement = account_movement_expression()
+    rows = session.execute(
+        select(
+            Account,
+            func.coalesce(func.sum(movement), 0),
+            func.count(Transaction.id),
+        )
+        .outerjoin(Transaction, Transaction.account_id == Account.id)
+        .group_by(Account.id)
+        .order_by(Account.name)
+    )
+    return [
+        AccountRead(
+            id=account.id,
+            name=account.name,
+            balance_cents=account.balance_adjustment_cents + int(net_movement),
+            transaction_count=int(transaction_count),
+            created_at=account.created_at,
+            updated_at=account.updated_at,
+        )
+        for account, net_movement, transaction_count in rows
+    ]
+
+
+@router.post(
+    "/accounts",
+    response_model=AccountRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_account(payload: AccountCreate, session: SessionDependency) -> AccountRead:
+    name = normalized_account_name(payload.name)
+    if not name:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Введите название счёта",
+        )
+    if find_account_by_name(session, name):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Счёт с таким названием уже существует",
+        )
+
+    account = Account(name=name, balance_adjustment_cents=payload.balance_cents)
+    session.add(account)
+    try:
+        session.commit()
+    except IntegrityError as error:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Счёт с таким названием уже существует",
+        ) from error
+    session.refresh(account)
+    return AccountRead(
+        id=account.id,
+        name=account.name,
+        balance_cents=payload.balance_cents,
+        transaction_count=0,
+        created_at=account.created_at,
+        updated_at=account.updated_at,
+    )
+
+
+@router.patch("/accounts/{account_id}", response_model=AccountRead)
+def update_account(
+    account_id: int,
+    payload: AccountUpdate,
+    session: SessionDependency,
+) -> AccountRead:
+    account = get_account(session, account_id)
+    changes = payload.model_dump(exclude_unset=True)
+    movement = account_movement(session, account.id)
+
+    if "name" in changes:
+        name = normalized_account_name(changes["name"])
+        duplicate = find_account_by_name(session, name)
+        if duplicate and duplicate.id != account.id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Счёт с таким названием уже существует",
+            )
+        account.name = name
+        session.execute(
+            update(Transaction)
+            .where(Transaction.account_id == account.id)
+            .values(source=name)
+        )
+
+    if "balance_cents" in changes:
+        account.balance_adjustment_cents = changes["balance_cents"] - movement
+
+    session.commit()
+    session.refresh(account)
+    transaction_count = int(
+        session.scalar(
+            select(func.count(Transaction.id)).where(Transaction.account_id == account.id)
+        )
+        or 0
+    )
+    return AccountRead(
+        id=account.id,
+        name=account.name,
+        balance_cents=account.balance_adjustment_cents + movement,
+        transaction_count=transaction_count,
+        created_at=account.created_at,
+        updated_at=account.updated_at,
+    )
 
 
 @router.get("/months", response_model=list[MonthRead])
@@ -132,8 +283,18 @@ def create_transaction(
     payload: TransactionCreate, session: SessionDependency
 ) -> Transaction:
     validate_category(payload.type, payload.category)
+    data = payload.model_dump()
+    account_id = data.pop("account_id")
+    source = normalized_account_name(data.pop("source"))
+    account = get_account(session, account_id) if account_id else find_account_by_name(session, source)
+    if account is None:
+        account = Account(name=source, balance_adjustment_cents=0)
+        session.add(account)
+        session.flush()
     transaction = Transaction(
-        **payload.model_dump(),
+        **data,
+        account_id=account.id,
+        source=account.name,
         kind=TransactionKind.manual,
         included_in_analytics=True,
         status="Ок",
@@ -157,6 +318,27 @@ def update_transaction(
     changes = payload.model_dump(exclude_unset=True)
     if "category" in changes:
         validate_category(transaction.type, changes["category"])
+    requested_account_id = changes.pop("account_id", None)
+    requested_source = changes.pop("source", None)
+    if "account_id" in payload.model_fields_set:
+        if requested_account_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Выберите счёт",
+            )
+        account = get_account(session, requested_account_id)
+        transaction.account_id = account.id
+        transaction.source = account.name
+    elif requested_source is not None:
+        source_name = normalized_account_name(requested_source)
+        account = find_account_by_name(session, source_name)
+        if account is None:
+            account = Account(name=source_name, balance_adjustment_cents=0)
+            session.add(account)
+            session.flush()
+        transaction.account_id = account.id
+        transaction.source = account.name
+
     for field, value in changes.items():
         setattr(transaction, field, value)
 
@@ -293,8 +475,27 @@ async def import_excel(
     )
     session.add(batch)
     session.flush()
+    account_names = sorted({transaction.source for transaction in unique_transactions})
+    accounts_by_name = {
+        account.name: account
+        for account in session.scalars(select(Account).where(Account.name.in_(account_names)))
+    }
+    for account_name in account_names:
+        if account_name not in accounts_by_name:
+            account = Account(name=account_name, balance_adjustment_cents=0)
+            session.add(account)
+            session.flush()
+            accounts_by_name[account_name] = account
     for transaction in unique_transactions:
-        session.add(Transaction(**transaction.__dict__, import_batch_id=batch.id))
+        account = accounts_by_name[transaction.source]
+        session.add(
+            Transaction(
+                **transaction.__dict__,
+                import_batch_id=batch.id,
+                account_id=account.id,
+                source=account.name,
+            )
+        )
     session.commit()
     session.refresh(batch)
 

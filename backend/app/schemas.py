@@ -11,6 +11,7 @@ class TransactionCreate(BaseModel):
     category: str = Field(min_length=1, max_length=100)
     comment: str | None = Field(default=None, max_length=255)
     source: str = Field(min_length=1, max_length=100)
+    account_id: int | None = Field(default=None, gt=0)
     type: TransactionType
 
 
@@ -34,6 +35,7 @@ class TransactionUpdate(BaseModel):
     category: str | None = Field(default=None, min_length=1, max_length=100)
     comment: str | None = Field(default=None, max_length=255)
     source: str | None = Field(default=None, min_length=1, max_length=100)
+    account_id: int | None = Field(default=None, gt=0)
 
     @model_validator(mode="after")
     def require_change(self) -> "TransactionUpdate":
@@ -75,6 +77,31 @@ class ImportRead(BaseModel):
 class CategoriesRead(BaseModel):
     expense: list[str]
     income: list[str]
+
+
+class AccountCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    balance_cents: int = 0
+
+
+class AccountUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    balance_cents: int | None = None
+
+    @model_validator(mode="after")
+    def require_change(self) -> "AccountUpdate":
+        if not self.model_fields_set:
+            raise ValueError("Укажите хотя бы одно поле для изменения")
+        return self
+
+
+class AccountRead(BaseModel):
+    id: int
+    name: str
+    balance_cents: int
+    transaction_count: int
+    created_at: datetime
+    updated_at: datetime
 
 
 class HealthRead(BaseModel):

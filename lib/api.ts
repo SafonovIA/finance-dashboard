@@ -17,6 +17,7 @@ export type Transaction = {
   category: string;
   comment: string | null;
   source: string;
+  account_id: number;
   type: TransactionType;
   kind: TransactionKind;
   included_in_analytics: boolean;
@@ -24,6 +25,15 @@ export type Transaction = {
   bank_category: string | null;
   mcc: string | null;
   status: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Account = {
+  id: number;
+  name: string;
+  balance_cents: number;
+  transaction_count: number;
   created_at: string;
   updated_at: string;
 };

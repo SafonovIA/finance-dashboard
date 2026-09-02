@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Check, Pencil, X } from 'lucide-react';
 import { useMonth } from '@/components/month-context';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { formatCurrency, requestJson, type Transaction, type TransactionType } from '@/lib/api';
+import { formatCurrency, requestJson, type Account, type Transaction, type TransactionType } from '@/lib/api';
 
 const categories = {
   expense: ['Продукты', 'Транспорт', 'Жилье', 'Развлечения', 'Здоровье', 'Другое'],
@@ -16,12 +16,13 @@ type EditValues = {
   amount: string;
   category: string;
   comment: string;
-  source: string;
+  account_id: string;
 };
 
 export default function MonthPage() {
   const { selectedMonth, loading: monthsLoading } = useMonth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,7 +34,12 @@ export default function MonthPage() {
     }
     setError(null);
     try {
-      setTransactions(await requestJson<Transaction[]>(`/api/transactions?month=${selectedMonth}`));
+      const [transactionRows, accountRows] = await Promise.all([
+        requestJson<Transaction[]>(`/api/transactions?month=${selectedMonth}`),
+        requestJson<Account[]>('/api/accounts'),
+      ]);
+      setTransactions(transactionRows);
+      setAccounts(accountRows);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Не удалось загрузить операции');
     } finally {
@@ -66,8 +72,8 @@ export default function MonthPage() {
 
   return (
     <div className="space-y-5">
-      <TransactionsTable title="Расходы" rows={expenses} tone="expense" onUpdated={handleUpdated} />
-      <TransactionsTable title="Доходы" rows={incomes} tone="income" onUpdated={handleUpdated} />
+      <TransactionsTable title="Расходы" rows={expenses} accounts={accounts} tone="expense" onUpdated={handleUpdated} />
+      <TransactionsTable title="Доходы" rows={incomes} accounts={accounts} tone="income" onUpdated={handleUpdated} />
     </div>
   );
 }
@@ -75,11 +81,13 @@ export default function MonthPage() {
 function TransactionsTable({
   title,
   rows,
+  accounts,
   tone,
   onUpdated,
 }: {
   title: string;
   rows: Transaction[];
+  accounts: Account[];
   tone: TransactionType;
   onUpdated: (transaction: Transaction) => void;
 }) {
@@ -100,7 +108,7 @@ function TransactionsTable({
       amount: (transaction.amount_cents / 100).toFixed(2),
       category: transaction.category,
       comment: transaction.comment ?? '',
-      source: transaction.source,
+      account_id: String(transaction.account_id),
     });
     setError(null);
   };
@@ -123,7 +131,7 @@ function TransactionsTable({
           amount_cents: Math.round(amount * 100),
           category: values.category,
           comment: values.comment || null,
-          source: values.source,
+          account_id: Number(values.account_id),
         }),
       });
       onUpdated(updated);
@@ -178,7 +186,17 @@ function TransactionsTable({
                   {editing ? <EditorInput value={values.comment} onChange={(value) => setValues({ ...values, comment: value })} /> : (transaction.comment ?? '—')}
                 </TableCell>
                 <TableCell className="h-10 max-w-[180px] px-2 py-1.5 text-[#bcc8d5]">
-                  {editing ? <EditorInput value={values.source} onChange={(value) => setValues({ ...values, source: value })} /> : transaction.source}
+                  {editing ? (
+                    <select
+                      className="editor-control"
+                      value={values.account_id}
+                      onChange={(event) => setValues({ ...values, account_id: event.target.value })}
+                    >
+                      {accounts.map((account) => (
+                        <option key={account.id} value={account.id}>{account.name}</option>
+                      ))}
+                    </select>
+                  ) : transaction.source}
                 </TableCell>
                 <TableCell className="h-10 w-20 px-2 py-1.5 text-right">
                   {editing ? (
