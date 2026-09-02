@@ -1,15 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Check, Pencil, X } from 'lucide-react';
+import { Check, Pencil, Trash2, X } from 'lucide-react';
 import { useMonth } from '@/components/month-context';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { formatCurrency, requestJson, type Account, type Transaction, type TransactionType } from '@/lib/api';
+import { formatCurrency, requestJson, type Account, type Categories, type Category, type Transaction, type TransactionType } from '@/lib/api';
 
-const categories = {
-  expense: ['Продукты', 'Транспорт', 'Жилье', 'Развлечения', 'Здоровье', 'Другое'],
-  income: ['Зарплата', 'Фриланс', 'Инвестиции', 'Другое'],
-};
+const emptyCategories: Categories = { expense: [], income: [] };
 
 type EditValues = {
   occurred_on: string;
@@ -23,6 +20,7 @@ export default function MonthPage() {
   const { selectedMonth, loading: monthsLoading } = useMonth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [categories, setCategories] = useState<Categories>(emptyCategories);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,12 +32,14 @@ export default function MonthPage() {
     }
     setError(null);
     try {
-      const [transactionRows, accountRows] = await Promise.all([
+      const [transactionRows, accountRows, categoryRows] = await Promise.all([
         requestJson<Transaction[]>(`/api/transactions?month=${selectedMonth}`),
         requestJson<Account[]>('/api/accounts'),
+        requestJson<Categories>('/api/categories'),
       ]);
       setTransactions(transactionRows);
       setAccounts(accountRows);
+      setCategories(categoryRows);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Не удалось загрузить операции');
     } finally {
@@ -64,7 +64,12 @@ export default function MonthPage() {
     window.dispatchEvent(new Event('finance-data-updated'));
   };
 
-  if (monthsLoading || loading) return <div className="h-[420px] animate-pulse rounded-xl border border-[#15283b] bg-card" />;
+  const handleDeleted = (transactionId: number) => {
+    setTransactions((current) => current.filter((item) => item.id !== transactionId));
+    window.dispatchEvent(new Event('finance-data-updated'));
+  };
+
+  if (monthsLoading || loading) return <div className="h-[483px] animate-pulse rounded-xl border border-[#15283b] bg-card" />;
   if (error) return <p className="rounded-lg border border-[#5b2a32] bg-[#25151d] p-4 text-sm text-[#ff9ca8]">{error}</p>;
   if (!selectedMonth) {
     return <p className="rounded-xl border border-dashed border-[#25415d] bg-[#0a1725] px-6 py-16 text-center text-sm text-[#91a2b5]">Загрузите Excel-файл, чтобы увидеть операции за месяц.</p>;
@@ -72,8 +77,8 @@ export default function MonthPage() {
 
   return (
     <div className="space-y-5">
-      <TransactionsTable title="Расходы" rows={expenses} accounts={accounts} tone="expense" onUpdated={handleUpdated} />
-      <TransactionsTable title="Доходы" rows={incomes} accounts={accounts} tone="income" onUpdated={handleUpdated} />
+      <TransactionsTable title="Расходы" rows={expenses} accounts={accounts} categories={categories.expense} tone="expense" onUpdated={handleUpdated} onDeleted={handleDeleted} />
+      <TransactionsTable title="Доходы" rows={incomes} accounts={accounts} categories={categories.income} tone="income" onUpdated={handleUpdated} onDeleted={handleDeleted} />
     </div>
   );
 }
@@ -82,14 +87,18 @@ function TransactionsTable({
   title,
   rows,
   accounts,
+  categories,
   tone,
   onUpdated,
+  onDeleted,
 }: {
   title: string;
   rows: Transaction[];
   accounts: Account[];
+  categories: Category[];
   tone: TransactionType;
   onUpdated: (transaction: Transaction) => void;
+  onDeleted: (transactionId: number) => void;
 }) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [values, setValues] = useState<EditValues | null>(null);
@@ -144,18 +153,36 @@ function TransactionsTable({
     }
   };
 
+  const remove = async (transaction: Transaction) => {
+    if (!window.confirm('Удалить эту операцию? Она исчезнет из статистики.')) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await requestJson<void>(`/api/transactions/${transaction.id}`, { method: 'DELETE' });
+      if (editingId === transaction.id) {
+        setEditingId(null);
+        setValues(null);
+      }
+      onDeleted(transaction.id);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Не удалось удалить операцию');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <section className="rounded-xl border border-[#15283b] bg-card p-4 sm:p-5">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className={`text-sm font-semibold ${toneClass}`}>{title}</h2>
-        <span className="text-[11px] text-[#718398]">Нажмите на карандаш, чтобы изменить строку</span>
+        <span className="text-[13px] text-[#718398]">Строки можно изменять и удалять</span>
       </div>
       {error ? <p className="mb-3 rounded-md bg-[#2b1720] px-3 py-2 text-xs text-[#ff9ca8]">{error}</p> : null}
-      <Table className="min-w-[900px] text-[12px]">
+      <Table className="min-w-[1035px] text-[14px]">
         <TableHeader>
           <TableRow className="border-[#17293c] hover:bg-transparent">
             {['Дата', 'Сумма', 'Категория', 'Комментарий', 'Источник', ''].map((heading) => (
-              <TableHead key={heading || 'actions'} className="h-8 px-2 text-[11px] font-medium text-[#91a0b1]">{heading}</TableHead>
+              <TableHead key={heading || 'actions'} className="h-8 px-2 text-[13px] font-medium text-[#91a0b1]">{heading}</TableHead>
             ))}
           </TableRow>
         </TableHeader>
@@ -178,14 +205,14 @@ function TransactionsTable({
                 <TableCell className="h-10 px-2 py-1.5 text-[#bcc8d5]">
                   {editing ? (
                     <select className="editor-control" value={values.category} onChange={(event) => setValues({ ...values, category: event.target.value })}>
-                      {categories[tone].map((category) => <option key={category}>{category}</option>)}
+                      {categories.map((category) => <option key={category.id} value={category.name}>{category.name}</option>)}
                     </select>
                   ) : transaction.category}
                 </TableCell>
-                <TableCell className="h-10 max-w-[260px] px-2 py-1.5 text-[#bcc8d5]">
+                <TableCell className="h-10 max-w-[299px] px-2 py-1.5 text-[#bcc8d5]">
                   {editing ? <EditorInput value={values.comment} onChange={(value) => setValues({ ...values, comment: value })} /> : (transaction.comment ?? '—')}
                 </TableCell>
-                <TableCell className="h-10 max-w-[180px] px-2 py-1.5 text-[#bcc8d5]">
+                <TableCell className="h-10 max-w-[207px] px-2 py-1.5 text-[#bcc8d5]">
                   {editing ? (
                     <select
                       className="editor-control"
@@ -198,14 +225,17 @@ function TransactionsTable({
                     </select>
                   ) : transaction.source}
                 </TableCell>
-                <TableCell className="h-10 w-20 px-2 py-1.5 text-right">
+                <TableCell className="h-10 w-24 px-2 py-1.5 text-right">
                   {editing ? (
                     <div className="flex justify-end gap-1">
                       <IconButton label="Сохранить" disabled={saving} onClick={() => void save(transaction)}><Check className="size-3.5" /></IconButton>
                       <IconButton label="Отменить" disabled={saving} onClick={() => { setEditingId(null); setValues(null); setError(null); }}><X className="size-3.5" /></IconButton>
                     </div>
                   ) : (
-                    <IconButton label="Изменить" onClick={() => startEditing(transaction)}><Pencil className="size-3.5" /></IconButton>
+                    <div className="flex justify-end gap-1">
+                      <IconButton label="Изменить" onClick={() => startEditing(transaction)}><Pencil className="size-3.5" /></IconButton>
+                      <IconButton danger label="Удалить" disabled={saving} onClick={() => void remove(transaction)}><Trash2 className="size-3.5" /></IconButton>
+                    </div>
                   )}
                 </TableCell>
               </TableRow>
@@ -225,8 +255,8 @@ function EditorInput({ value, onChange, ...props }: Omit<React.InputHTMLAttribut
   return <input {...props} className="editor-control" value={value} onChange={(event) => onChange(event.target.value)} />;
 }
 
-function IconButton({ label, children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { label: string }) {
-  return <button {...props} type="button" aria-label={label} title={label} className="inline-grid size-7 place-items-center rounded-md border border-[#24405d] text-[#91b9df] transition-colors hover:bg-[#17304a] disabled:opacity-50">{children}</button>;
+function IconButton({ label, danger = false, children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { label: string; danger?: boolean }) {
+  return <button {...props} type="button" aria-label={label} title={label} className={`inline-grid size-7 place-items-center rounded-md border transition-colors disabled:opacity-50 ${danger ? 'border-[#49303a] text-[#d8949e] hover:bg-[#2b1720]' : 'border-[#24405d] text-[#91b9df] hover:bg-[#17304a]'}`}>{children}</button>;
 }
 
 function formatDate(value: string) {

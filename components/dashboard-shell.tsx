@@ -31,11 +31,11 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const { months, selectedMonth, setSelectedMonth, loading } = useMonth();
 
   return (
-    <div className="min-h-screen bg-background text-foreground md:grid md:grid-cols-[196px_minmax(0,1fr)]">
+    <div className="min-h-screen bg-background text-foreground md:grid md:grid-cols-[225px_minmax(0,1fr)]">
       <aside className="border-b border-border bg-[#091522] md:sticky md:top-0 md:flex md:h-screen md:flex-col md:border-r md:border-b-0">
-        <div className="hidden h-[76px] items-center px-5 md:flex">
+        <div className="hidden h-[87px] items-center px-5 md:flex">
           <div className="grid size-9 place-items-center rounded-xl border border-[#22384f] bg-[#0d1d2d] text-[#78b4f4] shadow-[0_0_24px_rgba(67,137,216,0.12)]">
-            <CircleDollarSign className="size-[18px]" aria-hidden="true" />
+            <CircleDollarSign className="size-[21px]" aria-hidden="true" />
           </div>
         </div>
 
@@ -47,7 +47,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                 key={href}
                 href={href}
                 className={cn(
-                  'flex min-w-max items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] transition-colors',
+                  'flex min-w-max items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] transition-colors',
                   active
                     ? 'bg-[#132943] text-[#7eb9f7]'
                     : 'text-[#a2afbe] hover:bg-[#0f2032] hover:text-[#d8e5f2]',
@@ -64,7 +64,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         <div className="mt-auto hidden p-3 md:block">
           <button
             type="button"
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-[13px] text-[#8999aa] transition-colors hover:bg-[#0f2032] hover:text-[#d8e5f2]"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-[15px] text-[#8999aa] transition-colors hover:bg-[#0f2032] hover:text-[#d8e5f2]"
           >
             <Settings className="size-4" aria-hidden="true" />
             <span>Настройки</span>
@@ -73,7 +73,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main className="min-w-0">
-        <header className="grid min-h-[76px] grid-cols-[1fr_auto_1fr] items-center border-b border-border px-5 sm:px-8">
+        <header className="grid min-h-[87px] grid-cols-[1fr_auto_1fr] items-center border-b border-border px-5 sm:px-8">
           <span aria-hidden="true" />
           <h1 className="text-sm font-semibold tracking-tight text-[#f2f6fb] sm:text-base">
             {titles[pathname] ?? 'Статистика'}
@@ -100,7 +100,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
             ) : null}
           </div>
         </header>
-        <div className="mx-auto w-full max-w-[1180px] p-5 sm:p-8">{children}</div>
+        <div className="mx-auto w-full max-w-[1357px] p-5 sm:p-8">{children}</div>
       </main>
     </div>
   );

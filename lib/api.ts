@@ -38,6 +38,21 @@ export type Account = {
   updated_at: string;
 };
 
+export type Category = {
+  id: number;
+  name: string;
+  type: TransactionType;
+  sort_order: number;
+  is_system: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Categories = {
+  expense: Category[];
+  income: Category[];
+};
+
 export type Statistics = {
   month: string;
   expenses: CategoryTotal[];
@@ -76,6 +91,7 @@ export async function requestJson<T>(url: string, init?: RequestInit): Promise<T
     }
     throw new Error(detail);
   }
+  if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
 

@@ -11,18 +11,27 @@ from sqlalchemy.orm import Session
 
 from backend.app.database import engine, get_session
 from backend.app.importer import (
-    EXPENSE_CATEGORIES,
-    INCOME_CATEGORIES,
     ImportFormatError,
     merchant_key,
     parse_transaction,
     read_excel_rows,
 )
-from backend.app.models import Account, CategoryRule, ImportBatch, Transaction, TransactionKind, TransactionType
+from backend.app.models import (
+    Account,
+    Category,
+    CategoryRule,
+    ImportBatch,
+    Transaction,
+    TransactionKind,
+    TransactionType,
+)
 from backend.app.schemas import (
     AccountCreate,
     AccountRead,
     AccountUpdate,
+    CategoryCreate,
+    CategoryRead,
+    CategoryUpdate,
     CategoriesRead,
     CategoryTotal,
     HealthRead,
@@ -68,9 +77,29 @@ def month_bounds(month: str) -> tuple[date, date]:
     return start, end
 
 
-def validate_category(transaction_type: TransactionType, category: str) -> None:
-    allowed = EXPENSE_CATEGORIES if transaction_type == TransactionType.expense else INCOME_CATEGORIES
-    if category not in allowed:
+def normalized_name(name: str) -> str:
+    return " ".join(name.split())
+
+
+def find_category(
+    session: Session,
+    transaction_type: TransactionType,
+    name: str,
+) -> Category | None:
+    return session.scalar(
+        select(Category).where(
+            Category.type == transaction_type,
+            func.lower(Category.name) == name.casefold(),
+        )
+    )
+
+
+def validate_category(
+    session: Session,
+    transaction_type: TransactionType,
+    category: str,
+) -> None:
+    if find_category(session, transaction_type, category) is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Недопустимая категория для типа {transaction_type.value}",
@@ -78,7 +107,7 @@ def validate_category(transaction_type: TransactionType, category: str) -> None:
 
 
 def normalized_account_name(name: str) -> str:
-    return " ".join(name.split())
+    return normalized_name(name)
 
 
 def get_account(session: Session, account_id: int) -> Account:
@@ -126,8 +155,144 @@ def health() -> HealthRead:
 
 
 @router.get("/categories", response_model=CategoriesRead)
-def categories() -> CategoriesRead:
-    return CategoriesRead(expense=EXPENSE_CATEGORIES, income=INCOME_CATEGORIES)
+def categories(session: SessionDependency) -> CategoriesRead:
+    rows = list(
+        session.scalars(
+            select(Category).order_by(Category.type, Category.sort_order, Category.id)
+        )
+    )
+    return CategoriesRead(
+        expense=[row for row in rows if row.type == TransactionType.expense],
+        income=[row for row in rows if row.type == TransactionType.income],
+    )
+
+
+@router.post(
+    "/categories",
+    response_model=CategoryRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_category(
+    payload: CategoryCreate,
+    session: SessionDependency,
+) -> Category:
+    name = normalized_name(payload.name)
+    if not name:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Введите название категории",
+        )
+    if find_category(session, payload.type, name):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Категория с таким названием уже существует",
+        )
+    next_order = int(
+        session.scalar(
+            select(func.coalesce(func.max(Category.sort_order), -1)).where(
+                Category.type == payload.type
+            )
+        )
+        or 0
+    ) + 1
+    category = Category(
+        name=name,
+        type=payload.type,
+        sort_order=next_order,
+        is_system=False,
+    )
+    session.add(category)
+    try:
+        session.commit()
+    except IntegrityError as error:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Категория с таким названием уже существует",
+        ) from error
+    session.refresh(category)
+    return category
+
+
+@router.patch("/categories/{category_id}", response_model=CategoryRead)
+def update_category(
+    category_id: int,
+    payload: CategoryUpdate,
+    session: SessionDependency,
+) -> Category:
+    category = session.get(Category, category_id)
+    if category is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Категория не найдена")
+    if category.is_system:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Системную категорию «Другое» нельзя изменить",
+        )
+
+    name = normalized_name(payload.name)
+    if not name:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Введите название категории",
+        )
+    duplicate = find_category(session, category.type, name)
+    if duplicate and duplicate.id != category.id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Категория с таким названием уже существует",
+        )
+
+    old_name = category.name
+    category.name = name
+    session.execute(
+        update(Transaction)
+        .where(Transaction.type == category.type, Transaction.category == old_name)
+        .values(category=name)
+    )
+    session.execute(
+        update(CategoryRule)
+        .where(CategoryRule.type == category.type, CategoryRule.category == old_name)
+        .values(category=name)
+    )
+    session.commit()
+    session.refresh(category)
+    return category
+
+
+@router.delete("/categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_category(category_id: int, session: SessionDependency) -> None:
+    category = session.get(Category, category_id)
+    if category is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Категория не найдена")
+    if category.is_system:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Системную категорию «Другое» нельзя удалить",
+        )
+
+    fallback = session.scalar(
+        select(Category).where(
+            Category.type == category.type,
+            Category.is_system.is_(True),
+        )
+    )
+    if fallback is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Не найдена системная категория «Другое»",
+        )
+    session.execute(
+        update(Transaction)
+        .where(Transaction.type == category.type, Transaction.category == category.name)
+        .values(category=fallback.name)
+    )
+    session.execute(
+        update(CategoryRule)
+        .where(CategoryRule.type == category.type, CategoryRule.category == category.name)
+        .values(category=fallback.name)
+    )
+    session.delete(category)
+    session.commit()
 
 
 @router.get("/accounts", response_model=list[AccountRead])
@@ -241,6 +406,35 @@ def update_account(
     )
 
 
+@router.delete("/accounts/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_account(account_id: int, session: SessionDependency) -> None:
+    account = get_account(session, account_id)
+    transaction_count = int(
+        session.scalar(
+            select(func.count(Transaction.id)).where(Transaction.account_id == account.id)
+        )
+        or 0
+    )
+    if transaction_count:
+        if account.name.casefold() == "Без счёта".casefold():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Счёт «Без счёта» используется операциями и не может быть удалён",
+            )
+        fallback = find_account_by_name(session, "Без счёта")
+        if fallback is None:
+            fallback = Account(name="Без счёта", balance_adjustment_cents=0)
+            session.add(fallback)
+            session.flush()
+        session.execute(
+            update(Transaction)
+            .where(Transaction.account_id == account.id)
+            .values(account_id=fallback.id, source=fallback.name)
+        )
+    session.delete(account)
+    session.commit()
+
+
 @router.get("/months", response_model=list[MonthRead])
 def list_months(session: SessionDependency) -> list[MonthRead]:
     dates = session.scalars(
@@ -282,7 +476,7 @@ def list_transactions(
 def create_transaction(
     payload: TransactionCreate, session: SessionDependency
 ) -> Transaction:
-    validate_category(payload.type, payload.category)
+    validate_category(session, payload.type, payload.category)
     data = payload.model_dump()
     account_id = data.pop("account_id")
     source = normalized_account_name(data.pop("source"))
@@ -317,7 +511,7 @@ def update_transaction(
 
     changes = payload.model_dump(exclude_unset=True)
     if "category" in changes:
-        validate_category(transaction.type, changes["category"])
+        validate_category(session, transaction.type, changes["category"])
     requested_account_id = changes.pop("account_id", None)
     requested_source = changes.pop("source", None)
     if "account_id" in payload.model_fields_set:
@@ -366,6 +560,15 @@ def update_transaction(
     return transaction
 
 
+@router.delete("/transactions/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_transaction(transaction_id: int, session: SessionDependency) -> None:
+    transaction = session.get(Transaction, transaction_id)
+    if transaction is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Операция не найдена")
+    session.delete(transaction)
+    session.commit()
+
+
 @router.get("/statistics", response_model=StatisticsRead)
 def statistics(
     session: SessionDependency,
@@ -379,8 +582,21 @@ def statistics(
         )
     )
 
-    expense_totals = {category: 0 for category in EXPENSE_CATEGORIES}
-    income_totals = {category: 0 for category in INCOME_CATEGORIES}
+    categories_by_type = {
+        TransactionType.expense: [],
+        TransactionType.income: [],
+    }
+    for category in session.scalars(
+        select(Category).order_by(Category.type, Category.sort_order, Category.id)
+    ):
+        categories_by_type[category.type].append(category.name)
+
+    expense_totals = {
+        category: 0 for category in categories_by_type[TransactionType.expense]
+    }
+    income_totals = {
+        category: 0 for category in categories_by_type[TransactionType.income]
+    }
     for transaction in transactions:
         if transaction.type == TransactionType.expense:
             multiplier = -1 if transaction.kind == TransactionKind.refund else 1
@@ -475,6 +691,14 @@ async def import_excel(
     )
     session.add(batch)
     session.flush()
+    available_categories = {
+        (category.type, category.name)
+        for category in session.scalars(select(Category))
+    }
+    fallback_categories = {
+        category.type: category.name
+        for category in session.scalars(select(Category).where(Category.is_system.is_(True)))
+    }
     account_names = sorted({transaction.source for transaction in unique_transactions})
     accounts_by_name = {
         account.name: account
@@ -488,9 +712,12 @@ async def import_excel(
             accounts_by_name[account_name] = account
     for transaction in unique_transactions:
         account = accounts_by_name[transaction.source]
+        transaction_data = transaction.__dict__.copy()
+        if (transaction.type, transaction.category) not in available_categories:
+            transaction_data["category"] = fallback_categories[transaction.type]
         session.add(
             Transaction(
-                **transaction.__dict__,
+                **transaction_data,
                 import_batch_id=batch.id,
                 account_id=account.id,
                 source=account.name,

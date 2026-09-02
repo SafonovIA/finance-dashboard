@@ -59,6 +59,7 @@
 
 html {
   background: var(--background);
+  font-size: 115%;
 }
 
 body {

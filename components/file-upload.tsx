@@ -63,7 +63,7 @@ export function FileUpload() {
         type="button"
         disabled={uploading}
         className={cn(
-          'flex min-h-[290px] w-full flex-col items-center justify-center rounded-xl border border-dashed border-[#2f68a2] bg-[#091727] px-6 text-center outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#4389d8] focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-wait',
+          'flex min-h-[334px] w-full flex-col items-center justify-center rounded-xl border border-dashed border-[#2f68a2] bg-[#091727] px-6 text-center outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#4389d8] focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-wait',
           dragging && 'border-[#74b6f7] bg-[#0d2035]',
         )}
         onClick={() => inputRef.current?.click()}
@@ -98,7 +98,7 @@ export function FileUpload() {
             <span className="mt-1 text-xs text-[#8292a7]">или нажмите для выбора</span>
           </>
         )}
-        <span className="mt-5 text-[11px] text-[#607187]">Excel (.xlsx, .xls), до 15 МБ</span>
+        <span className="mt-5 text-[13px] text-[#607187]">Excel (.xlsx, .xls), до 15 МБ</span>
       </button>
 
       {error ? <p role="alert" className="rounded-lg border border-[#5b2a32] bg-[#25151d] px-4 py-3 text-sm text-[#ff9ca8]">{error}</p> : null}

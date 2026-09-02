@@ -59,6 +59,27 @@ class CategoryRule(Base):
     )
 
 
+class Category(Base):
+    __tablename__ = "categories"
+    __table_args__ = (
+        UniqueConstraint("type", "name", name="uq_categories_type_name"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100))
+    type: Mapped[TransactionType] = mapped_column(
+        Enum(TransactionType, name="transaction_type", create_type=False), index=True
+    )
+    sort_order: Mapped[int] = mapped_column(default=0)
+    is_system: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class Account(Base):
     __tablename__ = "accounts"
 

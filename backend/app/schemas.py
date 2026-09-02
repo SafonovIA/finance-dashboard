@@ -74,9 +74,30 @@ class ImportRead(BaseModel):
     month: str | None
 
 
+class CategoryCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    type: TransactionType
+
+
+class CategoryUpdate(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+
+
+class CategoryRead(BaseModel):
+    id: int
+    name: str
+    type: TransactionType
+    sort_order: int
+    is_system: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class CategoriesRead(BaseModel):
-    expense: list[str]
-    income: list[str]
+    expense: list[CategoryRead]
+    income: list[CategoryRead]
 
 
 class AccountCreate(BaseModel):
