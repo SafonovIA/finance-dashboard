@@ -5,7 +5,7 @@ from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from sqlalchemy import case, func, select, text, update
+from sqlalchemy import case, delete, func, select, text, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -36,6 +36,7 @@ from backend.app.schemas import (
     CategoryTotal,
     HealthRead,
     ImportRead,
+    MonthDeleteRead,
     MonthRead,
     StatisticsRead,
     TransactionCreate,
@@ -466,6 +467,19 @@ def list_transactions(
         statement = statement.where(Transaction.included_in_analytics.is_(True))
     statement = statement.order_by(Transaction.occurred_on.desc(), Transaction.id.desc())
     return list(session.scalars(statement))
+
+
+@router.delete("/transactions", response_model=MonthDeleteRead)
+def delete_month_transactions(
+    session: SessionDependency,
+    month: str = Query(pattern=r"^\d{4}-\d{2}$"),
+) -> MonthDeleteRead:
+    start, end = month_bounds(month)
+    result = session.execute(
+        delete(Transaction).where(Transaction.occurred_on.between(start, end))
+    )
+    session.commit()
+    return MonthDeleteRead(month=month, deleted_rows=result.rowcount or 0)
 
 
 @router.post(

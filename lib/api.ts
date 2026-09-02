@@ -53,6 +53,11 @@ export type Categories = {
   income: Category[];
 };
 
+export type MonthDeleteResult = {
+  month: string;
+  deleted_rows: number;
+};
+
 export type Statistics = {
   month: string;
   expenses: CategoryTotal[];

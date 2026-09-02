@@ -1,10 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Check, Pencil, Trash2, X } from 'lucide-react';
+import { ArrowUpDown, Check, ChevronDown, ChevronUp, Pencil, Trash2, X } from 'lucide-react';
 import { useMonth } from '@/components/month-context';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { formatCurrency, requestJson, type Account, type Categories, type Category, type Transaction, type TransactionType } from '@/lib/api';
+import { formatCurrency, requestJson, type Account, type Categories, type Category, type MonthDeleteResult, type Transaction, type TransactionType } from '@/lib/api';
 
 const emptyCategories: Categories = { expense: [], income: [] };
 
@@ -16,6 +16,19 @@ type EditValues = {
   account_id: string;
 };
 
+type SortKey = 'occurred_on' | 'amount_cents' | 'category' | 'comment' | 'source';
+type SortDirection = 'asc' | 'desc';
+
+const tableColumns: { key: SortKey; label: string }[] = [
+  { key: 'occurred_on', label: 'Дата' },
+  { key: 'amount_cents', label: 'Сумма' },
+  { key: 'category', label: 'Категория' },
+  { key: 'comment', label: 'Комментарий' },
+  { key: 'source', label: 'Источник' },
+];
+
+const textCollator = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });
+
 export default function MonthPage() {
   const { selectedMonth, loading: monthsLoading } = useMonth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -23,6 +36,9 @@ export default function MonthPage() {
   const [categories, setCategories] = useState<Categories>(emptyCategories);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deletingMonth, setDeletingMonth] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const loadTransactions = useCallback(async () => {
     if (!selectedMonth) {
@@ -31,6 +47,8 @@ export default function MonthPage() {
       return;
     }
     setError(null);
+    setDeleteError(null);
+    setNotice(null);
     try {
       const [transactionRows, accountRows, categoryRows] = await Promise.all([
         requestJson<Transaction[]>(`/api/transactions?month=${selectedMonth}`),
@@ -69,6 +87,23 @@ export default function MonthPage() {
     window.dispatchEvent(new Event('finance-data-updated'));
   };
 
+  const deleteSelectedMonth = async () => {
+    if (!window.confirm(`Удалить все операции за ${selectedMonth}? Это действие нельзя отменить.`)) return;
+    setDeletingMonth(true);
+    setDeleteError(null);
+    setNotice(null);
+    try {
+      const result = await requestJson<MonthDeleteResult>(`/api/transactions?month=${selectedMonth}`, { method: 'DELETE' });
+      setTransactions([]);
+      setNotice(`Удалено операций: ${result.deleted_rows}`);
+      window.dispatchEvent(new Event('finance-data-updated'));
+    } catch (requestError) {
+      setDeleteError(requestError instanceof Error ? requestError.message : 'Не удалось удалить данные месяца');
+    } finally {
+      setDeletingMonth(false);
+    }
+  };
+
   if (monthsLoading || loading) return <div className="h-[483px] animate-pulse rounded-xl border border-[#15283b] bg-card" />;
   if (error) return <p className="rounded-lg border border-[#5b2a32] bg-[#25151d] p-4 text-sm text-[#ff9ca8]">{error}</p>;
   if (!selectedMonth) {
@@ -77,6 +112,19 @@ export default function MonthPage() {
 
   return (
     <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        {notice ? <output className="mr-auto text-sm text-[#75d391]">{notice}</output> : null}
+        {deleteError ? <p role="alert" className="mr-auto text-sm text-[#ff9ca8]">{deleteError}</p> : null}
+        <button
+          type="button"
+          disabled={deletingMonth}
+          onClick={() => void deleteSelectedMonth()}
+          className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#66313a] bg-[#25151d] px-3 text-sm font-medium text-[#ff9ca8] transition-colors hover:bg-[#321923] disabled:cursor-wait disabled:opacity-50"
+        >
+          <Trash2 className="size-4" aria-hidden="true" />
+          {deletingMonth ? 'Удаляем…' : 'Удалить данные за месяц'}
+        </button>
+      </div>
       <TransactionsTable title="Расходы" rows={expenses} accounts={accounts} categories={categories.expense} tone="expense" onUpdated={handleUpdated} onDeleted={handleDeleted} />
       <TransactionsTable title="Доходы" rows={incomes} accounts={accounts} categories={categories.income} tone="income" onUpdated={handleUpdated} onDeleted={handleDeleted} />
     </div>
@@ -104,11 +152,36 @@ function TransactionsTable({
   const [values, setValues] = useState<EditValues | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>('occurred_on');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const toneClass = tone === 'expense' ? 'text-[#f26868]' : 'text-[#63c978]';
   const total = rows.reduce(
     (sum, transaction) => sum + (transaction.kind === 'refund' ? -transaction.amount_cents : transaction.amount_cents),
     0,
   );
+  const sortedRows = useMemo(() => [...rows].sort((left, right) => {
+    let comparison: number;
+    if (sortKey === 'amount_cents') {
+      const leftAmount = left.kind === 'refund' ? -left.amount_cents : left.amount_cents;
+      const rightAmount = right.kind === 'refund' ? -right.amount_cents : right.amount_cents;
+      comparison = leftAmount - rightAmount;
+    } else if (sortKey === 'occurred_on') {
+      comparison = left.occurred_on.localeCompare(right.occurred_on);
+    } else {
+      comparison = textCollator.compare(left[sortKey] ?? '', right[sortKey] ?? '');
+    }
+    if (comparison === 0) return left.id - right.id;
+    return sortDirection === 'asc' ? comparison : -comparison;
+  }), [rows, sortDirection, sortKey]);
+
+  const changeSort = (key: SortKey) => {
+    if (key === sortKey) {
+      setSortDirection((current) => current === 'asc' ? 'desc' : 'asc');
+      return;
+    }
+    setSortKey(key);
+    setSortDirection('asc');
+  };
 
   const startEditing = (transaction: Transaction) => {
     setEditingId(transaction.id);
@@ -175,15 +248,25 @@ function TransactionsTable({
     <section className="rounded-xl border border-[#15283b] bg-card p-4 sm:p-5">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className={`text-sm font-semibold ${toneClass}`}>{title}</h2>
-        <span className="text-[13px] text-[#718398]">Строки можно изменять и удалять</span>
+        <span className="text-[13px] text-[#718398]">Нажмите заголовок столбца для сортировки</span>
       </div>
       {error ? <p className="mb-3 rounded-md bg-[#2b1720] px-3 py-2 text-xs text-[#ff9ca8]">{error}</p> : null}
       <Table className="min-w-[1035px] text-[14px]">
         <TableHeader>
           <TableRow className="border-[#17293c] hover:bg-transparent">
-            {['Дата', 'Сумма', 'Категория', 'Комментарий', 'Источник', ''].map((heading) => (
-              <TableHead key={heading || 'actions'} className="h-8 px-2 text-[13px] font-medium text-[#91a0b1]">{heading}</TableHead>
-            ))}
+            {tableColumns.map((column) => {
+              const active = sortKey === column.key;
+              const ariaSort = active ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none';
+              return (
+                <TableHead key={column.key} aria-sort={ariaSort} className="h-8 px-2 text-[13px] font-medium text-[#91a0b1]">
+                  <button type="button" onClick={() => changeSort(column.key)} className="inline-flex items-center gap-1.5 rounded px-1 py-1 transition-colors hover:bg-[#17304a] hover:text-[#d9e7f5]" title={`Сортировать по столбцу «${column.label}»`}>
+                    {column.label}
+                    <SortIcon active={active} direction={sortDirection} />
+                  </button>
+                </TableHead>
+              );
+            })}
+            <TableHead className="h-8 px-2 text-[13px] font-medium text-[#91a0b1]"><span className="sr-only">Действия</span></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -192,7 +275,7 @@ function TransactionsTable({
               <TableCell colSpan={6} className="h-20 text-center text-[#718398]">Операций нет</TableCell>
             </TableRow>
           ) : null}
-          {rows.map((transaction) => {
+          {sortedRows.map((transaction) => {
             const editing = editingId === transaction.id && values;
             return (
               <TableRow key={transaction.id} className="border-[#142638] hover:bg-[#112033]">
@@ -257,6 +340,13 @@ function EditorInput({ value, onChange, ...props }: Omit<React.InputHTMLAttribut
 
 function IconButton({ label, danger = false, children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { label: string; danger?: boolean }) {
   return <button {...props} type="button" aria-label={label} title={label} className={`inline-grid size-7 place-items-center rounded-md border transition-colors disabled:opacity-50 ${danger ? 'border-[#49303a] text-[#d8949e] hover:bg-[#2b1720]' : 'border-[#24405d] text-[#91b9df] hover:bg-[#17304a]'}`}>{children}</button>;
+}
+
+function SortIcon({ active, direction }: { active: boolean; direction: SortDirection }) {
+  if (!active) return <ArrowUpDown className="size-3.5 opacity-45" aria-hidden="true" />;
+  return direction === 'asc'
+    ? <ChevronUp className="size-3.5 text-[#78b4f4]" aria-hidden="true" />
+    : <ChevronDown className="size-3.5 text-[#78b4f4]" aria-hidden="true" />;
 }
 
 function formatDate(value: string) {

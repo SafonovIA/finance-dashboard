@@ -63,6 +63,11 @@ class MonthRead(BaseModel):
     label: str
 
 
+class MonthDeleteRead(BaseModel):
+    month: str
+    deleted_rows: int
+
+
 class ImportRead(BaseModel):
     id: int
     filename: str
