@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { flushSync } from 'react-dom';
+import { Select, SelectTrigger, SelectContent, SelectItem } from '@/components/ui/select';
 import { ArrowUpDown, Check, ChevronDown, ChevronUp, Trash2, X } from 'lucide-react';
 import { CategoryIcon, CategorySelect } from '@/components/category-icon';
 import { useMonth } from '@/components/month-context';
@@ -151,6 +153,7 @@ function TransactionsTable({
   onDeleted: (transactionId: number) => void;
 }) {
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [initialField, setInitialField] = useState<keyof EditValues>('occurred_on');
   const [values, setValues] = useState<EditValues | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -210,9 +213,11 @@ function TransactionsTable({
     setSourceFilter('');
   };
 
-  const startEditing = (transaction: Transaction) => {
+  const startEditing = (transaction: Transaction, field: keyof EditValues) => {
     if (saving) return;
     if (editingId !== null && editingId !== transaction.id && !window.confirm('Отменить несохранённые изменения строки?')) return;
+    flushSync(() => {
+    setInitialField(field);
     setEditingId(transaction.id);
     setValues({
       occurred_on: transaction.occurred_on,
@@ -222,6 +227,15 @@ function TransactionsTable({
       account_id: String(transaction.account_id),
     });
     setError(null);
+    });
+    const row = document.getElementById(`transaction-${transaction.id}`);
+    const column = ['occurred_on', 'amount', 'category', 'comment', 'account_id'].indexOf(field);
+    const input = row?.querySelectorAll('td')[column]?.querySelector('input');
+    if (input) {
+      input.focus();
+      if (field === 'comment') input.select();
+      if (field === 'occurred_on') { try { input.showPicker(); } catch { /* Keyboard editing remains available. */ } }
+    }
   };
 
   const save = async (transaction: Transaction) => {
@@ -341,34 +355,28 @@ function TransactionsTable({
           {sortedRows.map((transaction) => {
             const editing = editingId === transaction.id && values;
             return (
-              <TableRow key={transaction.id} className="border-[#142638] hover:bg-[#112033]">
+              <TableRow id={`transaction-${transaction.id}`} key={transaction.id} className="border-[#142638] hover:bg-[#112033]">
                 <TableCell className="h-10 px-2 py-1.5 text-[#bcc8d5]">
-                  {editing ? <EditorInput aria-label="Дата" type="date" value={values.occurred_on} onChange={(value) => setValues({ ...values, occurred_on: value })} /> : <FieldButton label="Изменить дату" onClick={() => startEditing(transaction)}>{formatDate(transaction.occurred_on)}</FieldButton>}
+                  {editing ? <EditorInput aria-label="Дата" type="date" value={values.occurred_on} onChange={(value) => setValues({ ...values, occurred_on: value })} /> : <FieldButton label="Изменить дату" onClick={() => startEditing(transaction, 'occurred_on')}>{formatDate(transaction.occurred_on)}</FieldButton>}
                 </TableCell>
                 <TableCell className="h-10 px-2 py-1.5 font-medium tabular-nums text-[#edf3f9]">
-                  {editing ? <EditorInput aria-label="Сумма" type="number" step="0.01" min="0.01" value={values.amount} onChange={(value) => setValues({ ...values, amount: value })} /> : <FieldButton label="Изменить сумму" onClick={() => startEditing(transaction)}>{`${transaction.kind === 'refund' ? '−' : ''}${formatCurrency(transaction.amount_cents)}`}</FieldButton>}
+                  {editing ? <EditorInput aria-label="Сумма" type="number" step="0.01" min="0.01" value={values.amount} onChange={(value) => setValues({ ...values, amount: value })} /> : <FieldButton label="Изменить сумму" onClick={() => startEditing(transaction, 'amount')}>{`${transaction.kind === 'refund' ? '−' : ''}${formatCurrency(transaction.amount_cents)}`}</FieldButton>}
                 </TableCell>
                 <TableCell className="h-10 px-2 py-1.5 text-[#bcc8d5]">
                   {editing ? (
-                    <CategorySelect categories={categories} value={values.category} onChange={(category) => setValues({ ...values, category })} disabled={saving} />
-                  ) : <FieldButton label="Изменить категорию" onClick={() => startEditing(transaction)}><CategoryIcon icon={categories.find((category) => category.name === transaction.category)?.icon} color={categories.find((category) => category.name === transaction.category)?.icon_color} />{transaction.category}</FieldButton>}
+                    <CategorySelect defaultOpen={initialField === 'category'} categories={categories} value={values.category} onChange={(category) => setValues({ ...values, category })} disabled={saving} />
+                  ) : <FieldButton label="Изменить категорию" onClick={() => startEditing(transaction, 'category')}><CategoryIcon icon={categories.find((category) => category.name === transaction.category)?.icon} color={categories.find((category) => category.name === transaction.category)?.icon_color} />{transaction.category}</FieldButton>}
                 </TableCell>
                 <TableCell className="h-10 max-w-[299px] px-2 py-1.5 text-[#bcc8d5]">
-                  {editing ? <EditorInput aria-label="Комментарий" value={values.comment} onChange={(value) => setValues({ ...values, comment: value })} /> : <FieldButton label="Изменить комментарий" onClick={() => startEditing(transaction)}>{transaction.comment ?? '—'}</FieldButton>}
+                  {editing ? <EditorInput aria-label="Комментарий" value={values.comment} onChange={(value) => setValues({ ...values, comment: value })} /> : <FieldButton label="Изменить комментарий" onClick={() => startEditing(transaction, 'comment')}>{transaction.comment ?? '—'}</FieldButton>}
                 </TableCell>
                 <TableCell className="h-10 max-w-[207px] px-2 py-1.5 text-[#bcc8d5]">
                   {editing ? (
-                    <select
-                      className="editor-control"
-                      aria-label="Источник"
-                      value={values.account_id}
-                      onChange={(event) => setValues({ ...values, account_id: event.target.value })}
-                    >
-                      {accounts.map((account) => (
-                        <option key={account.id} value={account.id}>{account.name}</option>
-                      ))}
-                    </select>
-                  ) : <FieldButton label="Изменить источник" onClick={() => startEditing(transaction)}>{transaction.source}</FieldButton>}
+                    <Select defaultOpen={initialField === 'account_id'} value={values.account_id} onValueChange={(account_id) => { if (account_id !== null) setValues({ ...values, account_id }); }} disabled={saving}>
+                      <SelectTrigger aria-label="Источник" className="w-full"><span className="truncate">{accounts.find((account) => String(account.id) === values.account_id)?.name}</span></SelectTrigger>
+                      <SelectContent>{accounts.map((account) => <SelectItem key={account.id} value={String(account.id)}>{account.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                  ) : <FieldButton label="Изменить источник" onClick={() => startEditing(transaction, 'account_id')}>{transaction.source}</FieldButton>}
                 </TableCell>
                 <TableCell className="h-10 w-24 px-2 py-1.5 text-right">
                   {editing ? (

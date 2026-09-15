@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.database import Base
 from backend.app.models import Account, Category, CategoryRule, Transaction, TransactionType
-from backend.app.api import update_category, update_transaction, move_category, move_account, list_accounts
+from backend.app.api import update_category, update_transaction, move_category, move_account, list_accounts, place_category, place_account
 from backend.app.schemas import CategoryUpdate, TransactionUpdate
 from backend.app.importer import parse_transaction
 from backend.tests.test_importer import operation
@@ -99,3 +99,31 @@ class CategoryChangesTests(unittest.TestCase):
         self.assertEqual({row.id: row.balance_cents for row in rows}, before)
         move_account(second.id, self.session, "down")
         self.assertEqual(list_accounts(self.session)[-1].id, second.id)
+
+    def test_drop_category_across_multiple_rows_and_reject_other_panel(self):
+        middle = Category(name="middle", type=TransactionType.expense, sort_order=1)
+        last = Category(name="last", type=TransactionType.expense, sort_order=2)
+        income = Category(name="income", type=TransactionType.income)
+        self.session.add_all([middle, last, income])
+        self.session.commit()
+        place_category(self.category.id, last.id, self.session)
+        self.session.expire_all()
+        rows = list(self.session.scalars(select(Category).where(Category.type == TransactionType.expense).order_by(Category.sort_order)))
+        self.assertEqual([row.id for row in rows], [middle.id, last.id, self.category.id])
+        place_category(self.category.id, middle.id, self.session)
+        self.assertEqual(self.category.sort_order, 0)
+        from fastapi import HTTPException
+        with self.assertRaises(HTTPException):
+            place_category(self.category.id, income.id, self.session)
+        self.session.rollback()
+
+    def test_drop_account_keeps_balances(self):
+        last = Account(name="zzz", balance_adjustment_cents=100)
+        self.session.add(last)
+        self.session.commit()
+        initial = list_accounts(self.session)
+        place_account(last.id, initial[0].id, self.session)
+        self.session.expire_all()
+        result = list_accounts(self.session)
+        self.assertEqual(result[0].id, last.id)
+        self.assertEqual({row.id: row.balance_cents for row in initial}, {row.id: row.balance_cents for row in result})

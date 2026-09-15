@@ -320,6 +320,33 @@ def move_account(account_id: int, session: SessionDependency, direction: str = Q
     session.commit()
 
 
+@router.post("/categories/{category_id}/place", status_code=status.HTTP_204_NO_CONTENT)
+def place_category(category_id: int, target_id: int, session: SessionDependency) -> None:
+    category = session.get(Category, category_id)
+    if category is None:
+        raise HTTPException(status_code=404, detail="Категория не найдена")
+    rows = list(session.scalars(select(Category).where(Category.type == category.type).order_by(Category.sort_order, Category.id).with_for_update()))
+    place_row(rows, category_id, target_id)
+    session.commit()
+
+
+@router.post("/accounts/{account_id}/place", status_code=status.HTTP_204_NO_CONTENT)
+def place_account(account_id: int, target_id: int, session: SessionDependency) -> None:
+    rows = list(session.scalars(select(Account).order_by(Account.sort_order, Account.name, Account.id).with_for_update()))
+    place_row(rows, account_id, target_id)
+    session.commit()
+
+
+def place_row(rows, row_id: int, target_id: int) -> None:
+    ids = [row.id for row in rows]
+    if row_id not in ids or target_id not in ids:
+        raise HTTPException(status_code=422, detail="Строки должны быть в одной панели")
+    source, target = ids.index(row_id), ids.index(target_id)
+    rows.insert(target, rows.pop(source))
+    for position, row in enumerate(rows):
+        row.sort_order = position
+
+
 def move_row(rows, row_id: int, direction: str) -> None:
     index = next(index for index, row in enumerate(rows) if row.id == row_id)
     target = index + (-1 if direction == "up" else 1)

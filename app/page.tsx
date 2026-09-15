@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ChevronUp,
-  ChevronDown,
+  GripVertical,
   Check,
   Landmark,
   Pencil,
@@ -214,12 +213,13 @@ function StatisticsCard({
           <CategoryEditor name={name} icon={icon} color={iconColor} onColor={setIconColor} onIcon={setIcon} saving={saving} onName={setName} onSave={() => void save()} onCancel={cancel} />
         ) : null}
         {ordering.error && <li role="alert" className="text-xs text-[#ff9ca8]">{ordering.error}</li>}
-        {rows.map(({ category, amount_cents }, index) => {
+        {rows.map(({ category, amount_cents }) => {
           if (editingId === category.id) {
             return <CategoryEditor key={category.id} name={name} icon={icon} color={iconColor} onColor={setIconColor} onIcon={setIcon} system={category.is_system} saving={saving} onName={setName} onSave={() => void save()} onCancel={cancel} />;
           }
           return (
-            <li key={category.id} className="flex items-center gap-2 rounded-lg px-1 py-1.5">
+            <li key={category.id} {...ordering.dragProps(category.id, saving || editingId !== null)} className={`flex items-center gap-2 rounded-lg px-1 py-1.5 ${ordering.over === category.id ? 'bg-[#17304a] ring-1 ring-[#78b4f4]' : ''}`}>
+              <GripVertical className="size-3.5 shrink-0 text-[#718398]" aria-hidden="true" />
               <span className="grid size-8 shrink-0 place-items-center">
                 <CategoryIcon icon={category.icon} color={category.icon_color} />
               </span>
@@ -227,7 +227,6 @@ function StatisticsCard({
               <span className="ml-auto shrink-0 text-sm font-medium tabular-nums text-[#edf3f9]">{formatCurrency(amount_cents)}</span>
               {(
                 <div className="flex shrink-0 gap-1">
-                  <MoveButtons name={category.name} first={index === 0} last={index === rows.length - 1} disabled={saving || ordering.pending || editingId !== null} onMove={(direction) => void ordering.move(category.id, direction)} />
                   <SmallButton label={`Изменить категорию ${category.name}`} onClick={() => beginEdit(category)}><Pencil className="size-3.5" /></SmallButton>
                   {!category.is_system && <SmallButton danger label={`Удалить категорию ${category.name}`} disabled={saving} onClick={() => void remove(category)}><Trash2 className="size-3.5" /></SmallButton>}
                 </div>
@@ -349,15 +348,15 @@ function AccountsCard({ accounts, onChanged }: { accounts: Account[]; onChanged:
           <p className="rounded-lg border border-dashed border-[#25415d] px-4 py-8 text-center text-xs text-[#718398]">Добавьте первый счёт</p>
         ) : null}
         {ordering.error && <p role="alert" className="text-xs text-[#ff9ca8]">{ordering.error}</p>}
-        {accounts.map((account, index) => editingId === account.id ? (
+        {accounts.map((account) => editingId === account.id ? (
           <AccountEditor key={account.id} name={name} balance={balance} saving={saving} onName={setName} onBalance={setBalance} onSave={() => void save()} onCancel={cancel} />
         ) : (
-          <div key={account.id} className="flex items-center gap-2 rounded-lg px-1 py-1.5">
+          <div key={account.id} {...ordering.dragProps(account.id, saving || editingId !== null)} className={`flex items-center gap-2 rounded-lg px-1 py-1.5 ${ordering.over === account.id ? 'bg-[#17304a] ring-1 ring-[#78b4f4]' : ''}`}>
+            <GripVertical className="size-3.5 shrink-0 text-[#718398]" aria-hidden="true" />
             <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#17253b] text-[#76a8ef]"><Landmark className="size-4" aria-hidden="true" /></span>
             <span className="min-w-0 truncate text-sm text-[#d7e0ea]" title={account.name}>{account.name}</span>
             <span className={`ml-auto shrink-0 text-sm font-medium tabular-nums ${account.balance_cents < 0 ? 'text-[#f26868]' : 'text-[#edf3f9]'}`}>{formatCurrency(account.balance_cents)}</span>
             <div className="flex shrink-0 gap-1">
-              <MoveButtons name={account.name} first={index === 0} last={index === accounts.length - 1} disabled={saving || ordering.pending || editingId !== null} onMove={(direction) => void ordering.move(account.id, direction)} />
               <SmallButton label={`Изменить счёт ${account.name}`} onClick={() => beginEdit(account)}><Pencil className="size-3.5" /></SmallButton>
               <SmallButton danger label={`Удалить счёт ${account.name}`} disabled={saving} onClick={() => void remove(account)}><Trash2 className="size-3.5" /></SmallButton>
             </div>
@@ -389,24 +388,42 @@ function AccountEditor({ name, balance, saving, onName, onBalance, onSave, onCan
 function useOrdering(resource: 'categories' | 'accounts', onChanged: () => Promise<void>) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const move = async (id: number, direction: 'up' | 'down') => {
+  const [dragged, setDragged] = useState<number | null>(null);
+  const [over, setOver] = useState<number | null>(null);
+  const move = async (id: number, target: number) => {
     setPending(true);
     setError(null);
     try {
-      await requestJson<void>(`/api/${resource}/${id}/move?direction=${direction}`, { method: 'POST' });
+      await requestJson<void>(`/api/${resource}/${id}/place?target_id=${target}`, { method: 'POST' });
       await onChanged();
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'Не удалось изменить порядок');
     } finally { setPending(false); }
   };
-  return { move, pending, error };
-}
-
-function MoveButtons({ name, first, last, disabled, onMove }: { name: string; first: boolean; last: boolean; disabled: boolean; onMove: (direction: 'up' | 'down') => void }) {
-  return <div className="flex flex-col justify-center gap-0.5">
-    <button type="button" title="Переместить вверх" aria-label={`${name}: вверх`} disabled={disabled || first} onClick={() => onMove('up')} className="rounded text-[#91b9df] hover:bg-[#17304a] disabled:opacity-25"><ChevronUp className="size-3.5" /></button>
-    <button type="button" title="Переместить вниз" aria-label={`${name}: вниз`} disabled={disabled || last} onClick={() => onMove('down')} className="rounded text-[#91b9df] hover:bg-[#17304a] disabled:opacity-25"><ChevronDown className="size-3.5" /></button>
-  </div>;
+  const dragProps = (id: number, disabled: boolean): React.HTMLAttributes<HTMLElement> => ({
+    draggable: !disabled && !pending,
+    title: 'Зажмите левую кнопку мыши и перетащите строку',
+    style: { cursor: disabled || pending ? 'default' : 'grab', opacity: dragged === id ? 0.5 : 1 },
+    onDragStart: (event) => {
+      if (disabled || pending || (event.target as HTMLElement).closest('button, input')) { event.preventDefault(); return; }
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', String(id));
+      setDragged(id);
+    },
+    onDragOver: (event) => {
+      if (dragged === null || disabled || pending) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+      setOver(id);
+    },
+    onDrop: (event) => {
+      event.preventDefault();
+      if (!disabled && !pending && dragged !== null && dragged !== id) void move(dragged, id);
+      setDragged(null); setOver(null);
+    },
+    onDragEnd: () => { setDragged(null); setOver(null); },
+  });
+  return { pending, error, over, dragProps };
 }
 
 function SmallButton({ label, danger = false, children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { label: string; danger?: boolean }) {
