@@ -343,7 +343,7 @@ function TransactionsTable({
                 <TableCell className="h-10 px-2 py-1.5 text-[#bcc8d5]">
                   {editing ? (
                     <CategorySelect categories={categories} value={values.category} onChange={(category) => setValues({ ...values, category })} disabled={saving} />
-                  ) : <FieldButton label="Изменить категорию" onClick={() => startEditing(transaction)}><CategoryIcon icon={categories.find((category) => category.name === transaction.category)?.icon} />{transaction.category}</FieldButton>}
+                  ) : <FieldButton label="Изменить категорию" onClick={() => startEditing(transaction)}><CategoryIcon icon={categories.find((category) => category.name === transaction.category)?.icon} color={categories.find((category) => category.name === transaction.category)?.icon_color} />{transaction.category}</FieldButton>}
                 </TableCell>
                 <TableCell className="h-10 max-w-[299px] px-2 py-1.5 text-[#bcc8d5]">
                   {editing ? <EditorInput aria-label="Комментарий" value={values.comment} onChange={(value) => setValues({ ...values, comment: value })} /> : <FieldButton label="Изменить комментарий" onClick={() => startEditing(transaction)}>{transaction.comment ?? '—'}</FieldButton>}

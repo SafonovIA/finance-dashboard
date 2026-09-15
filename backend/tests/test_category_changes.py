@@ -55,3 +55,18 @@ class CategoryChangesTests(unittest.TestCase):
         from fastapi import HTTPException
         with self.assertRaises(HTTPException):
             update_category(self.category.id, CategoryUpdate(name="renamed"), self.session)
+
+    def test_new_icons_and_colors_persist(self):
+        for icon in ("bottle", "arrows", "dollar"):
+            update_category(self.category.id, CategoryUpdate(name="custom", icon=icon, icon_color="#12abEF"), self.session)
+            self.session.expire_all()
+            self.assertEqual(self.category.icon, icon)
+            self.assertEqual(self.category.icon_color, "#12abEF")
+        update_category(self.category.id, CategoryUpdate(name="custom", icon="gift"), self.session)
+        self.assertEqual(self.category.icon_color, "#12abEF")
+
+    def test_invalid_color_is_rejected(self):
+        from pydantic import ValidationError
+        for color in ("red", "#123", "#gggggg", "url(test)"):
+            with self.assertRaises(ValidationError):
+                CategoryUpdate(name="custom", icon_color=color)

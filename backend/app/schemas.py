@@ -80,24 +80,27 @@ class ImportRead(BaseModel):
     month: str | None
 
 
-CategoryIcon = Literal["other", "basket", "bus", "home", "game", "health", "work", "art", "growth", "car", "coffee", "gift", "plane", "book", "pet", "wallet"]
+CategoryIcon = Literal["other", "basket", "bus", "home", "game", "health", "work", "art", "growth", "car", "coffee", "gift", "plane", "book", "pet", "wallet", "bottle", "arrows", "dollar"]
 
 
 class CategoryCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     type: TransactionType
     icon: CategoryIcon = "other"
+    icon_color: str = Field(default="#78b4f4", pattern=r"^#[0-9a-fA-F]{6}$")
 
 
 class CategoryUpdate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     icon: CategoryIcon | None = None
+    icon_color: str | None = Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$")
 
 
 class CategoryRead(BaseModel):
     id: int
     name: str
     icon: str
+    icon_color: str
     type: TransactionType
     sort_order: int
     is_system: bool

@@ -145,6 +145,7 @@ function StatisticsCard({
   const [editingId, setEditingId] = useState<number | 'new' | null>(null);
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('other');
+  const [iconColor, setIconColor] = useState('#78b4f4');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isExpense = tone === 'expense';
@@ -153,6 +154,7 @@ function StatisticsCard({
     setEditingId('new');
     setName('');
     setIcon('other');
+    setIconColor(isExpense ? '#f0647d' : '#71d28a');
     setError(null);
   };
 
@@ -160,6 +162,7 @@ function StatisticsCard({
     setEditingId(category.id);
     setName(category.name);
     setIcon(category.icon);
+    setIconColor(category.icon_color);
     setError(null);
   };
 
@@ -180,7 +183,7 @@ function StatisticsCard({
       await requestJson<Category>(creating ? '/api/categories' : `/api/categories/${editingId}`, {
         method: creating ? 'POST' : 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(creating ? { name: name.trim(), type: tone, icon } : { name: name.trim(), icon }),
+        body: JSON.stringify(creating ? { name: name.trim(), type: tone, icon, icon_color: iconColor } : { name: name.trim(), icon, icon_color: iconColor }),
       });
       setEditingId(null);
       await onChanged();
@@ -220,17 +223,17 @@ function StatisticsCard({
 
       <ul className="max-h-[380px] space-y-2 overflow-y-auto pr-1">
         {editingId === 'new' ? (
-          <CategoryEditor name={name} icon={icon} onIcon={setIcon} saving={saving} onName={setName} onSave={() => void save()} onCancel={cancel} />
+          <CategoryEditor name={name} icon={icon} color={iconColor} onColor={setIconColor} onIcon={setIcon} saving={saving} onName={setName} onSave={() => void save()} onCancel={cancel} />
         ) : null}
         {rows.map(({ category, amount_cents }) => {
           if (editingId === category.id) {
-            return <CategoryEditor key={category.id} name={name} icon={icon} onIcon={setIcon} system={category.is_system} saving={saving} onName={setName} onSave={() => void save()} onCancel={cancel} />;
+            return <CategoryEditor key={category.id} name={name} icon={icon} color={iconColor} onColor={setIconColor} onIcon={setIcon} system={category.is_system} saving={saving} onName={setName} onSave={() => void save()} onCancel={cancel} />;
           }
           const expenseVisual = expenseVisuals[category.name as keyof typeof expenseVisuals] ?? expenseVisuals.Другое;
           return (
             <li key={category.id} className="flex items-center gap-2 rounded-lg px-1 py-1.5">
               <span className={`grid size-8 shrink-0 place-items-center rounded-lg ${isExpense ? '' : 'bg-[#173027] text-[#71d28a]'}`} style={isExpense ? { color: expenseVisual.color, background: expenseVisual.background } : undefined}>
-                <CategoryIcon icon={category.icon} />
+                <CategoryIcon icon={category.icon} color={category.icon_color} />
               </span>
               <span className="min-w-0 truncate text-sm text-[#d7e0ea]" title={category.name}>{category.name}</span>
               <span className="ml-auto shrink-0 text-sm font-medium tabular-nums text-[#edf3f9]">{formatCurrency(amount_cents)}</span>
@@ -252,13 +255,14 @@ function StatisticsCard({
   );
 }
 
-function CategoryEditor({ name, icon, onIcon, system = false, saving, onName, onSave, onCancel }: { name: string; icon: string; onIcon: (value: string) => void; system?: boolean; saving: boolean; onName: (value: string) => void; onSave: () => void; onCancel: () => void }) {
+function CategoryEditor({ name, icon, color, onColor, onIcon, system = false, saving, onName, onSave, onCancel }: { name: string; icon: string; color: string; onColor: (value: string) => void; onIcon: (value: string) => void; system?: boolean; saving: boolean; onName: (value: string) => void; onSave: () => void; onCancel: () => void }) {
   return (
     <li className="grid grid-cols-[1fr_auto_auto] gap-2 rounded-lg border border-[#25415d] bg-[#0a1725] p-2.5">
       <input disabled={system || saving} className="editor-control" value={name} maxLength={100} placeholder="Название категории" aria-label="Название категории" onChange={(event) => onName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') onSave(); }} />
       <SmallButton label="Сохранить категорию" disabled={saving} onClick={onSave}><Check className="size-3.5" /></SmallButton>
       <SmallButton label="Отменить" disabled={saving} onClick={onCancel}><X className="size-3.5" /></SmallButton>
-      <IconPicker value={icon} onChange={onIcon} disabled={saving} />
+      <IconPicker value={icon} color={color} onChange={onIcon} disabled={saving} />
+      <label className="col-span-full flex items-center gap-3 text-xs text-[#91a2b5]">Цвет иконки<input type="color" value={color} disabled={saving} onChange={(event) => onColor(event.target.value)} className="h-8 w-12 cursor-pointer rounded border border-[#24405d] bg-transparent" /><span>{color}</span></label>
     </li>
   );
 }

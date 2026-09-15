@@ -199,6 +199,7 @@ def create_category(
     category = Category(
         name=name,
         icon=payload.icon,
+        icon_color=payload.icon_color,
         type=payload.type,
         sort_order=next_order,
         is_system=False,
@@ -248,6 +249,8 @@ def update_category(
     category.name = name
     if payload.icon is not None:
         category.icon = payload.icon
+    if payload.icon_color is not None:
+        category.icon_color = payload.icon_color
     session.execute(
         update(Transaction)
         .where(Transaction.type == category.type, Transaction.category == old_name)
