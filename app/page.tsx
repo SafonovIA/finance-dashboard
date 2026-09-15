@@ -16,7 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { useMonth } from '@/components/month-context';
-import { CategoryIcon, IconPicker } from '@/components/category-icon';
+import { CategoryIcon, ColorPicker, IconPicker } from '@/components/category-icon';
 import {
   formatCurrency,
   requestJson,
@@ -154,7 +154,7 @@ function StatisticsCard({
     setEditingId('new');
     setName('');
     setIcon('other');
-    setIconColor(isExpense ? '#f0647d' : '#71d28a');
+    setIconColor(isExpense ? '#e995a3' : '#8fc6a4');
     setError(null);
   };
 
@@ -262,7 +262,7 @@ function CategoryEditor({ name, icon, color, onColor, onIcon, system = false, sa
       <SmallButton label="Сохранить категорию" disabled={saving} onClick={onSave}><Check className="size-3.5" /></SmallButton>
       <SmallButton label="Отменить" disabled={saving} onClick={onCancel}><X className="size-3.5" /></SmallButton>
       <IconPicker value={icon} color={color} onChange={onIcon} disabled={saving} />
-      <label className="col-span-full flex items-center gap-3 text-xs text-[#91a2b5]">Цвет иконки<input type="color" value={color} disabled={saving} onChange={(event) => onColor(event.target.value)} className="h-8 w-12 cursor-pointer rounded border border-[#24405d] bg-transparent" /><span>{color}</span></label>
+      <ColorPicker value={color} onChange={onColor} disabled={saving} />
     </li>
   );
 }

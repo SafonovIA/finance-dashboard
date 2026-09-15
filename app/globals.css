@@ -80,6 +80,26 @@ input {
   background: rgba(67, 137, 216, 0.34);
 }
 
+.month-table th,
+.month-table td {
+  overflow: hidden;
+}
+
+.month-table input,
+.month-table select,
+.month-table [data-slot='select-trigger'] {
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+}
+
+.month-table td > button,
+.month-table [data-slot='select-trigger'] > span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
 .editor-control {
   min-height: 2rem;
   width: 100%;

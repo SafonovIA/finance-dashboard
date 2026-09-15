@@ -281,7 +281,15 @@ function TransactionsTable({
         <span className="text-[13px] text-[#718398]">Показано {filteredRows.length} из {rows.length} · нажмите поле для изменения, ✓ для сохранения</span>
       </div>
       {error ? <p className="mb-3 rounded-md bg-[#2b1720] px-3 py-2 text-xs text-[#ff9ca8]">{error}</p> : null}
-      <Table className="min-w-[1035px] text-[14px]">
+      <Table className="month-table min-w-[1035px] table-fixed text-[14px]">
+        <colgroup>
+          <col style={{ width: '17%' }} />
+          <col style={{ width: '14%' }} />
+          <col style={{ width: '20%' }} />
+          <col style={{ width: '23%' }} />
+          <col style={{ width: '18%' }} />
+          <col style={{ width: '8%' }} />
+        </colgroup>
         <TableHeader>
           <TableRow className="border-[#17293c] hover:bg-transparent">
             {tableColumns.map((column) => {

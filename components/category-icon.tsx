@@ -12,6 +12,25 @@ const icons = {
   bottle: [BottleWine, 'Бутылка'], arrows: [ArrowUpDown, 'Стрелки вверх и вниз'], dollar: [DollarSign, 'Доллар'],
 } as const;
 
+const iconColors = [
+  ['#e995a3', 'Пыльная роза'], ['#e7aa8b', 'Персиковый'],
+  ['#dfc17e', 'Песочный'], ['#b8ca8a', 'Фисташковый'],
+  ['#8fc6a4', 'Шалфейный'], ['#82c4c0', 'Бирюзовый'],
+  ['#8cb7df', 'Небесный'], ['#9fa9dd', 'Барвинковый'],
+  ['#b6a0d6', 'Лавандовый'], ['#c79bbd', 'Вересковый'],
+] as const;
+
+export function ColorPicker({ value, onChange, disabled }: { value: string; onChange: (value: string) => void; disabled: boolean }) {
+  return <fieldset disabled={disabled} className="col-span-full">
+    <legend className="mb-2 text-xs text-[#91a2b5]">Цвет иконки</legend>
+    <div className="flex flex-wrap gap-2">{iconColors.map(([color, label]) => (
+      <button key={color} type="button" aria-label={label} title={label} aria-pressed={value.toLowerCase() === color} onClick={() => onChange(color)} className="grid size-8 place-items-center rounded-full border-2 border-transparent outline-offset-2 hover:border-white/50 focus-visible:outline-2 focus-visible:outline-white disabled:opacity-50 aria-pressed:border-white" style={{ backgroundColor: color }}>
+        {value.toLowerCase() === color ? <span className="text-sm font-bold text-[#15283b]" aria-hidden="true">✓</span> : null}
+      </button>
+    ))}</div>
+  </fieldset>;
+}
+
 export function CategoryIcon({ icon, color }: { icon?: string; color?: string }) {
   const [Icon] = icons[icon as keyof typeof icons] ?? icons.other;
   return <Icon className="size-4 shrink-0" style={color ? { color } : undefined} aria-hidden="true" />;
