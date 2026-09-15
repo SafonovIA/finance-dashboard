@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.database import Base
 from backend.app.models import Account, Category, CategoryRule, Transaction, TransactionType
-from backend.app.api import update_category, update_transaction
+from backend.app.api import update_category, update_transaction, move_category, move_account, list_accounts
 from backend.app.schemas import CategoryUpdate, TransactionUpdate
 from backend.app.importer import parse_transaction
 from backend.tests.test_importer import operation
@@ -70,3 +70,32 @@ class CategoryChangesTests(unittest.TestCase):
         for color in ("red", "#123", "#gggggg", "url(test)"):
             with self.assertRaises(ValidationError):
                 CategoryUpdate(name="custom", icon_color=color)
+
+    def test_category_order_is_persistent_and_scoped(self):
+        other = Category(name="second", type=TransactionType.expense, sort_order=1)
+        income = Category(name="income", type=TransactionType.income, sort_order=7)
+        self.session.add_all([other, income])
+        self.session.commit()
+        move_category(self.category.id, self.session, "down")
+        self.session.expire_all()
+        ordered = list(self.session.scalars(select(Category).where(Category.type == TransactionType.expense).order_by(Category.sort_order)))
+        self.assertEqual([row.id for row in ordered], [other.id, self.category.id])
+        self.assertEqual(income.sort_order, 7)
+        move_category(self.category.id, self.session, "down")
+        self.assertEqual(self.category.sort_order, 1)
+        move_category(self.category.id, self.session, "up")
+        self.assertEqual(self.category.sort_order, 0)
+        self.assertEqual(self.transaction.amount_cents, 50000)
+
+    def test_account_order_is_persistent_and_keeps_balances(self):
+        second = Account(name="zzz", balance_adjustment_cents=12345)
+        self.session.add(second)
+        self.session.commit()
+        before = {row.id: row.balance_cents for row in list_accounts(self.session)}
+        move_account(second.id, self.session, "up")
+        self.session.expire_all()
+        rows = list_accounts(self.session)
+        self.assertEqual(rows[0].id, second.id)
+        self.assertEqual({row.id: row.balance_cents for row in rows}, before)
+        move_account(second.id, self.session, "down")
+        self.assertEqual(list_accounts(self.session)[-1].id, second.id)

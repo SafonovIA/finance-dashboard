@@ -2,16 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Bus,
+  ChevronUp,
+  ChevronDown,
   Check,
-  Gamepad2,
-  HeartPulse,
-  House,
   Landmark,
-  MoreHorizontal,
   Pencil,
   Plus,
-  ShoppingBasket,
   Trash2,
   X,
 } from 'lucide-react';
@@ -27,15 +23,6 @@ import {
   type Statistics,
   type TransactionType,
 } from '@/lib/api';
-
-const expenseVisuals = {
-  Продукты: { icon: ShoppingBasket, color: '#f0647d', background: '#2b1b2b' },
-  Транспорт: { icon: Bus, color: '#76a8ef', background: '#17253b' },
-  Жилье: { icon: House, color: '#d785ee', background: '#281d37' },
-  Развлечения: { icon: Gamepad2, color: '#ee7f89', background: '#2a1d2a' },
-  Здоровье: { icon: HeartPulse, color: '#efa56f', background: '#2a241d' },
-  Другое: { icon: MoreHorizontal, color: '#e9bd65', background: '#29261d' },
-};
 
 const emptyCategories: Categories = { expense: [], income: [] };
 
@@ -149,6 +136,7 @@ function StatisticsCard({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isExpense = tone === 'expense';
+  const ordering = useOrdering('categories', onChanged);
 
   const beginCreate = () => {
     setEditingId('new');
@@ -225,20 +213,21 @@ function StatisticsCard({
         {editingId === 'new' ? (
           <CategoryEditor name={name} icon={icon} color={iconColor} onColor={setIconColor} onIcon={setIcon} saving={saving} onName={setName} onSave={() => void save()} onCancel={cancel} />
         ) : null}
-        {rows.map(({ category, amount_cents }) => {
+        {ordering.error && <li role="alert" className="text-xs text-[#ff9ca8]">{ordering.error}</li>}
+        {rows.map(({ category, amount_cents }, index) => {
           if (editingId === category.id) {
             return <CategoryEditor key={category.id} name={name} icon={icon} color={iconColor} onColor={setIconColor} onIcon={setIcon} system={category.is_system} saving={saving} onName={setName} onSave={() => void save()} onCancel={cancel} />;
           }
-          const expenseVisual = expenseVisuals[category.name as keyof typeof expenseVisuals] ?? expenseVisuals.Другое;
           return (
             <li key={category.id} className="flex items-center gap-2 rounded-lg px-1 py-1.5">
-              <span className={`grid size-8 shrink-0 place-items-center rounded-lg ${isExpense ? '' : 'bg-[#173027] text-[#71d28a]'}`} style={isExpense ? { color: expenseVisual.color, background: expenseVisual.background } : undefined}>
+              <span className="grid size-8 shrink-0 place-items-center">
                 <CategoryIcon icon={category.icon} color={category.icon_color} />
               </span>
               <span className="min-w-0 truncate text-sm text-[#d7e0ea]" title={category.name}>{category.name}</span>
               <span className="ml-auto shrink-0 text-sm font-medium tabular-nums text-[#edf3f9]">{formatCurrency(amount_cents)}</span>
               {(
                 <div className="flex shrink-0 gap-1">
+                  <MoveButtons name={category.name} first={index === 0} last={index === rows.length - 1} disabled={saving || ordering.pending || editingId !== null} onMove={(direction) => void ordering.move(category.id, direction)} />
                   <SmallButton label={`Изменить категорию ${category.name}`} onClick={() => beginEdit(category)}><Pencil className="size-3.5" /></SmallButton>
                   {!category.is_system && <SmallButton danger label={`Удалить категорию ${category.name}`} disabled={saving} onClick={() => void remove(category)}><Trash2 className="size-3.5" /></SmallButton>}
                 </div>
@@ -268,6 +257,7 @@ function CategoryEditor({ name, icon, color, onColor, onIcon, system = false, sa
 }
 
 function AccountsCard({ accounts, onChanged }: { accounts: Account[]; onChanged: () => Promise<void> }) {
+  const ordering = useOrdering('accounts', onChanged);
   const [editingId, setEditingId] = useState<number | 'new' | null>(null);
   const [name, setName] = useState('');
   const [balance, setBalance] = useState('0.00');
@@ -358,7 +348,8 @@ function AccountsCard({ accounts, onChanged }: { accounts: Account[]; onChanged:
         {accounts.length === 0 && editingId !== 'new' ? (
           <p className="rounded-lg border border-dashed border-[#25415d] px-4 py-8 text-center text-xs text-[#718398]">Добавьте первый счёт</p>
         ) : null}
-        {accounts.map((account) => editingId === account.id ? (
+        {ordering.error && <p role="alert" className="text-xs text-[#ff9ca8]">{ordering.error}</p>}
+        {accounts.map((account, index) => editingId === account.id ? (
           <AccountEditor key={account.id} name={name} balance={balance} saving={saving} onName={setName} onBalance={setBalance} onSave={() => void save()} onCancel={cancel} />
         ) : (
           <div key={account.id} className="flex items-center gap-2 rounded-lg px-1 py-1.5">
@@ -366,6 +357,7 @@ function AccountsCard({ accounts, onChanged }: { accounts: Account[]; onChanged:
             <span className="min-w-0 truncate text-sm text-[#d7e0ea]" title={account.name}>{account.name}</span>
             <span className={`ml-auto shrink-0 text-sm font-medium tabular-nums ${account.balance_cents < 0 ? 'text-[#f26868]' : 'text-[#edf3f9]'}`}>{formatCurrency(account.balance_cents)}</span>
             <div className="flex shrink-0 gap-1">
+              <MoveButtons name={account.name} first={index === 0} last={index === accounts.length - 1} disabled={saving || ordering.pending || editingId !== null} onMove={(direction) => void ordering.move(account.id, direction)} />
               <SmallButton label={`Изменить счёт ${account.name}`} onClick={() => beginEdit(account)}><Pencil className="size-3.5" /></SmallButton>
               <SmallButton danger label={`Удалить счёт ${account.name}`} disabled={saving} onClick={() => void remove(account)}><Trash2 className="size-3.5" /></SmallButton>
             </div>
@@ -392,6 +384,29 @@ function AccountEditor({ name, balance, saving, onName, onBalance, onSave, onCan
       </div>
     </div>
   );
+}
+
+function useOrdering(resource: 'categories' | 'accounts', onChanged: () => Promise<void>) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const move = async (id: number, direction: 'up' | 'down') => {
+    setPending(true);
+    setError(null);
+    try {
+      await requestJson<void>(`/api/${resource}/${id}/move?direction=${direction}`, { method: 'POST' });
+      await onChanged();
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'Не удалось изменить порядок');
+    } finally { setPending(false); }
+  };
+  return { move, pending, error };
+}
+
+function MoveButtons({ name, first, last, disabled, onMove }: { name: string; first: boolean; last: boolean; disabled: boolean; onMove: (direction: 'up' | 'down') => void }) {
+  return <div className="flex flex-col justify-center gap-0.5">
+    <button type="button" title="Переместить вверх" aria-label={`${name}: вверх`} disabled={disabled || first} onClick={() => onMove('up')} className="rounded text-[#91b9df] hover:bg-[#17304a] disabled:opacity-25"><ChevronUp className="size-3.5" /></button>
+    <button type="button" title="Переместить вниз" aria-label={`${name}: вниз`} disabled={disabled || last} onClick={() => onMove('down')} className="rounded text-[#91b9df] hover:bg-[#17304a] disabled:opacity-25"><ChevronDown className="size-3.5" /></button>
+  </div>;
 }
 
 function SmallButton({ label, danger = false, children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { label: string; danger?: boolean }) {

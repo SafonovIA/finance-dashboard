@@ -87,6 +87,7 @@ class Account(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    sort_order: Mapped[int] = mapped_column(default=1000000, server_default="1000000")
     balance_adjustment_cents: Mapped[int] = mapped_column(BigInteger, default=0)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

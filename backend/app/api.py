@@ -302,6 +302,33 @@ def delete_category(category_id: int, session: SessionDependency) -> None:
     session.commit()
 
 
+@router.post("/categories/{category_id}/move", status_code=status.HTTP_204_NO_CONTENT)
+def move_category(category_id: int, session: SessionDependency, direction: str = Query(pattern="^(up|down)$")) -> None:
+    category = session.get(Category, category_id)
+    if category is None:
+        raise HTTPException(status_code=404, detail="Категория не найдена")
+    rows = list(session.scalars(select(Category).where(Category.type == category.type).order_by(Category.sort_order, Category.id).with_for_update()))
+    move_row(rows, category_id, direction)
+    session.commit()
+
+
+@router.post("/accounts/{account_id}/move", status_code=status.HTTP_204_NO_CONTENT)
+def move_account(account_id: int, session: SessionDependency, direction: str = Query(pattern="^(up|down)$")) -> None:
+    get_account(session, account_id)
+    rows = list(session.scalars(select(Account).order_by(Account.sort_order, Account.name, Account.id).with_for_update()))
+    move_row(rows, account_id, direction)
+    session.commit()
+
+
+def move_row(rows, row_id: int, direction: str) -> None:
+    index = next(index for index, row in enumerate(rows) if row.id == row_id)
+    target = index + (-1 if direction == "up" else 1)
+    if 0 <= target < len(rows):
+        rows[index], rows[target] = rows[target], rows[index]
+    for position, row in enumerate(rows):
+        row.sort_order = position
+
+
 @router.get("/accounts", response_model=list[AccountRead])
 def list_accounts(session: SessionDependency) -> list[AccountRead]:
     movement = account_movement_expression()
@@ -313,7 +340,7 @@ def list_accounts(session: SessionDependency) -> list[AccountRead]:
         )
         .outerjoin(Transaction, Transaction.account_id == Account.id)
         .group_by(Account.id)
-        .order_by(Account.name)
+        .order_by(Account.sort_order, Account.name, Account.id)
     )
     return [
         AccountRead(

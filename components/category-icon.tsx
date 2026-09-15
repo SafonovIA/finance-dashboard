@@ -22,10 +22,10 @@ const iconColors = [
 
 export function ColorPicker({ value, onChange, disabled }: { value: string; onChange: (value: string) => void; disabled: boolean }) {
   return <fieldset disabled={disabled} className="col-span-full">
-    <legend className="mb-2 text-xs text-[#91a2b5]">Цвет иконки</legend>
+    <legend className="mb-2 text-xs text-[#91a2b5]">Цвет фона и иконки</legend>
     <div className="flex flex-wrap gap-2">{iconColors.map(([color, label]) => (
-      <button key={color} type="button" aria-label={label} title={label} aria-pressed={value.toLowerCase() === color} onClick={() => onChange(color)} className="grid size-8 place-items-center rounded-full border-2 border-transparent outline-offset-2 hover:border-white/50 focus-visible:outline-2 focus-visible:outline-white disabled:opacity-50 aria-pressed:border-white" style={{ backgroundColor: color }}>
-        {value.toLowerCase() === color ? <span className="text-sm font-bold text-[#15283b]" aria-hidden="true">✓</span> : null}
+      <button key={color} type="button" aria-label={label} title={label} aria-pressed={value.toLowerCase() === color} onClick={() => onChange(color)} className="grid size-8 place-items-center rounded-lg border-2 border-transparent outline-offset-2 hover:border-white/50 focus-visible:outline-2 focus-visible:outline-white disabled:opacity-50 aria-pressed:border-white" style={{ backgroundColor: `${color}26`, color }}>
+        <span className="text-lg font-bold" aria-hidden="true">{value.toLowerCase() === color ? '✓' : '●'}</span>
       </button>
     ))}</div>
   </fieldset>;
@@ -33,7 +33,7 @@ export function ColorPicker({ value, onChange, disabled }: { value: string; onCh
 
 export function CategoryIcon({ icon, color }: { icon?: string; color?: string }) {
   const [Icon] = icons[icon as keyof typeof icons] ?? icons.other;
-  return <Icon className="size-4 shrink-0" style={color ? { color } : undefined} aria-hidden="true" />;
+  return <span className="inline-grid size-7 shrink-0 place-items-center rounded-md" style={color ? { color, backgroundColor: `${color}26` } : undefined}><Icon className="size-4 shrink-0" aria-hidden="true" /></span>;
 }
 
 export function IconPicker({ value, color, onChange, disabled }: { value: string; color: string; onChange: (value: string) => void; disabled: boolean }) {
