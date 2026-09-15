@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowUpDown, Check, ChevronDown, ChevronUp, Pencil, Trash2, X } from 'lucide-react';
+import { ArrowUpDown, Check, ChevronDown, ChevronUp, Trash2, X } from 'lucide-react';
+import { CategoryIcon, CategorySelect } from '@/components/category-icon';
 import { useMonth } from '@/components/month-context';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -210,6 +211,8 @@ function TransactionsTable({
   };
 
   const startEditing = (transaction: Transaction) => {
+    if (saving) return;
+    if (editingId !== null && editingId !== transaction.id && !window.confirm('Отменить несохранённые изменения строки?')) return;
     setEditingId(transaction.id);
     setValues({
       occurred_on: transaction.occurred_on,
@@ -231,16 +234,17 @@ function TransactionsTable({
     setSaving(true);
     setError(null);
     try {
+      const changes: Record<string, unknown> = {};
+      if (values.occurred_on !== transaction.occurred_on) changes.occurred_on = values.occurred_on;
+      if (Math.round(amount * 100) !== transaction.amount_cents) changes.amount_cents = Math.round(amount * 100);
+      if (values.category !== transaction.category) changes.category = values.category;
+      if ((values.comment || null) !== transaction.comment) changes.comment = values.comment || null;
+      if (Number(values.account_id) !== transaction.account_id) changes.account_id = Number(values.account_id);
+      if (!Object.keys(changes).length) { setEditingId(null); setValues(null); return; }
       const updated = await requestJson<Transaction>(`/api/transactions/${transaction.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          occurred_on: values.occurred_on,
-          amount_cents: Math.round(amount * 100),
-          category: values.category,
-          comment: values.comment || null,
-          account_id: Number(values.account_id),
-        }),
+        body: JSON.stringify(changes),
       });
       onUpdated(updated);
       setEditingId(null);
@@ -274,7 +278,7 @@ function TransactionsTable({
     <section className="rounded-xl border border-[#15283b] bg-card p-4 sm:p-5">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className={`text-sm font-semibold ${toneClass}`}>{title}</h2>
-        <span className="text-[13px] text-[#718398]">Показано {filteredRows.length} из {rows.length} · заголовки сортируют</span>
+        <span className="text-[13px] text-[#718398]">Показано {filteredRows.length} из {rows.length} · нажмите поле для изменения, ✓ для сохранения</span>
       </div>
       {error ? <p className="mb-3 rounded-md bg-[#2b1720] px-3 py-2 text-xs text-[#ff9ca8]">{error}</p> : null}
       <Table className="min-w-[1035px] text-[14px]">
@@ -302,10 +306,7 @@ function TransactionsTable({
             <TableHead className="h-auto px-2 py-2"><span className="sr-only">Фильтр по сумме не задан</span></TableHead>
             <TableHead className="h-auto px-2 py-2">
               <label className="sr-only" htmlFor={`${tone}-category-filter`}>Фильтр по категории</label>
-              <select id={`${tone}-category-filter`} value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="h-8 w-full min-w-[10rem] rounded-lg border border-[#24405d] bg-[#091522] px-2 text-xs text-[#bcc8d5] outline-none focus:border-[#4389d8]">
-                <option value="">Все категории</option>
-                {categories.map((category) => <option key={category.id} value={category.name}>{category.name}</option>)}
-              </select>
+              <CategorySelect categories={categories} value={categoryFilter} onChange={setCategoryFilter} all label="Фильтр по категории" />
             </TableHead>
             <TableHead className="h-auto px-2 py-2">
               <label className="sr-only" htmlFor={`${tone}-comment-filter`}>Фильтр по комментарию</label>
@@ -334,25 +335,24 @@ function TransactionsTable({
             return (
               <TableRow key={transaction.id} className="border-[#142638] hover:bg-[#112033]">
                 <TableCell className="h-10 px-2 py-1.5 text-[#bcc8d5]">
-                  {editing ? <EditorInput type="date" value={values.occurred_on} onChange={(value) => setValues({ ...values, occurred_on: value })} /> : formatDate(transaction.occurred_on)}
+                  {editing ? <EditorInput aria-label="Дата" type="date" value={values.occurred_on} onChange={(value) => setValues({ ...values, occurred_on: value })} /> : <FieldButton label="Изменить дату" onClick={() => startEditing(transaction)}>{formatDate(transaction.occurred_on)}</FieldButton>}
                 </TableCell>
                 <TableCell className="h-10 px-2 py-1.5 font-medium tabular-nums text-[#edf3f9]">
-                  {editing ? <EditorInput type="number" step="0.01" min="0.01" value={values.amount} onChange={(value) => setValues({ ...values, amount: value })} /> : `${transaction.kind === 'refund' ? '−' : ''}${formatCurrency(transaction.amount_cents)}`}
+                  {editing ? <EditorInput aria-label="Сумма" type="number" step="0.01" min="0.01" value={values.amount} onChange={(value) => setValues({ ...values, amount: value })} /> : <FieldButton label="Изменить сумму" onClick={() => startEditing(transaction)}>{`${transaction.kind === 'refund' ? '−' : ''}${formatCurrency(transaction.amount_cents)}`}</FieldButton>}
                 </TableCell>
                 <TableCell className="h-10 px-2 py-1.5 text-[#bcc8d5]">
                   {editing ? (
-                    <select className="editor-control" value={values.category} onChange={(event) => setValues({ ...values, category: event.target.value })}>
-                      {categories.map((category) => <option key={category.id} value={category.name}>{category.name}</option>)}
-                    </select>
-                  ) : transaction.category}
+                    <CategorySelect categories={categories} value={values.category} onChange={(category) => setValues({ ...values, category })} disabled={saving} />
+                  ) : <FieldButton label="Изменить категорию" onClick={() => startEditing(transaction)}><CategoryIcon icon={categories.find((category) => category.name === transaction.category)?.icon} />{transaction.category}</FieldButton>}
                 </TableCell>
                 <TableCell className="h-10 max-w-[299px] px-2 py-1.5 text-[#bcc8d5]">
-                  {editing ? <EditorInput value={values.comment} onChange={(value) => setValues({ ...values, comment: value })} /> : (transaction.comment ?? '—')}
+                  {editing ? <EditorInput aria-label="Комментарий" value={values.comment} onChange={(value) => setValues({ ...values, comment: value })} /> : <FieldButton label="Изменить комментарий" onClick={() => startEditing(transaction)}>{transaction.comment ?? '—'}</FieldButton>}
                 </TableCell>
                 <TableCell className="h-10 max-w-[207px] px-2 py-1.5 text-[#bcc8d5]">
                   {editing ? (
                     <select
                       className="editor-control"
+                      aria-label="Источник"
                       value={values.account_id}
                       onChange={(event) => setValues({ ...values, account_id: event.target.value })}
                     >
@@ -360,7 +360,7 @@ function TransactionsTable({
                         <option key={account.id} value={account.id}>{account.name}</option>
                       ))}
                     </select>
-                  ) : transaction.source}
+                  ) : <FieldButton label="Изменить источник" onClick={() => startEditing(transaction)}>{transaction.source}</FieldButton>}
                 </TableCell>
                 <TableCell className="h-10 w-24 px-2 py-1.5 text-right">
                   {editing ? (
@@ -370,7 +370,6 @@ function TransactionsTable({
                     </div>
                   ) : (
                     <div className="flex justify-end gap-1">
-                      <IconButton label="Изменить" onClick={() => startEditing(transaction)}><Pencil className="size-3.5" /></IconButton>
                       <IconButton danger label="Удалить" disabled={saving} onClick={() => void remove(transaction)}><Trash2 className="size-3.5" /></IconButton>
                     </div>
                   )}
@@ -386,6 +385,10 @@ function TransactionsTable({
       </div>
     </section>
   );
+}
+
+function FieldButton({ label, children, onClick }: { label: string; children: React.ReactNode; onClick: () => void }) {
+  return <button type="button" aria-label={label} title={label} onClick={onClick} className="flex min-h-8 w-full items-center gap-2 rounded px-1 text-left hover:bg-[#17304a] focus-visible:outline-2 focus-visible:outline-[#78b4f4]">{children}</button>;
 }
 
 function EditorInput({ value, onChange, ...props }: Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'> & { value: string; onChange: (value: string) => void }) {

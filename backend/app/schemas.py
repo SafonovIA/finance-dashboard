@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -79,18 +80,24 @@ class ImportRead(BaseModel):
     month: str | None
 
 
+CategoryIcon = Literal["other", "basket", "bus", "home", "game", "health", "work", "art", "growth", "car", "coffee", "gift", "plane", "book", "pet", "wallet"]
+
+
 class CategoryCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     type: TransactionType
+    icon: CategoryIcon = "other"
 
 
 class CategoryUpdate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
+    icon: CategoryIcon | None = None
 
 
 class CategoryRead(BaseModel):
     id: int
     name: str
+    icon: str
     type: TransactionType
     sort_order: int
     is_system: bool

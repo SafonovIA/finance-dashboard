@@ -41,6 +41,7 @@ export type Account = {
 export type Category = {
   id: number;
   name: string;
+  icon: string;
   type: TransactionType;
   sort_order: number;
   is_system: boolean;

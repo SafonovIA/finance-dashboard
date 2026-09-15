@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  BriefcaseBusiness,
   Bus,
   Check,
   Gamepad2,
@@ -10,15 +9,14 @@ import {
   House,
   Landmark,
   MoreHorizontal,
-  Palette,
   Pencil,
   Plus,
   ShoppingBasket,
   Trash2,
-  TrendingUp,
   X,
 } from 'lucide-react';
 import { useMonth } from '@/components/month-context';
+import { CategoryIcon, IconPicker } from '@/components/category-icon';
 import {
   formatCurrency,
   requestJson,
@@ -37,13 +35,6 @@ const expenseVisuals = {
   Развлечения: { icon: Gamepad2, color: '#ee7f89', background: '#2a1d2a' },
   Здоровье: { icon: HeartPulse, color: '#efa56f', background: '#2a241d' },
   Другое: { icon: MoreHorizontal, color: '#e9bd65', background: '#29261d' },
-};
-
-const incomeVisuals = {
-  Зарплата: BriefcaseBusiness,
-  Фриланс: Palette,
-  Инвестиции: TrendingUp,
-  Другое: MoreHorizontal,
 };
 
 const emptyCategories: Categories = { expense: [], income: [] };
@@ -153,6 +144,7 @@ function StatisticsCard({
 }) {
   const [editingId, setEditingId] = useState<number | 'new' | null>(null);
   const [name, setName] = useState('');
+  const [icon, setIcon] = useState('other');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isExpense = tone === 'expense';
@@ -160,12 +152,14 @@ function StatisticsCard({
   const beginCreate = () => {
     setEditingId('new');
     setName('');
+    setIcon('other');
     setError(null);
   };
 
   const beginEdit = (category: Category) => {
     setEditingId(category.id);
     setName(category.name);
+    setIcon(category.icon);
     setError(null);
   };
 
@@ -186,7 +180,7 @@ function StatisticsCard({
       await requestJson<Category>(creating ? '/api/categories' : `/api/categories/${editingId}`, {
         method: creating ? 'POST' : 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(creating ? { name: name.trim(), type: tone } : { name: name.trim() }),
+        body: JSON.stringify(creating ? { name: name.trim(), type: tone, icon } : { name: name.trim(), icon }),
       });
       setEditingId(null);
       await onChanged();
@@ -226,28 +220,26 @@ function StatisticsCard({
 
       <ul className="max-h-[380px] space-y-2 overflow-y-auto pr-1">
         {editingId === 'new' ? (
-          <CategoryEditor name={name} saving={saving} onName={setName} onSave={() => void save()} onCancel={cancel} />
+          <CategoryEditor name={name} icon={icon} onIcon={setIcon} saving={saving} onName={setName} onSave={() => void save()} onCancel={cancel} />
         ) : null}
         {rows.map(({ category, amount_cents }) => {
           if (editingId === category.id) {
-            return <CategoryEditor key={category.id} name={name} saving={saving} onName={setName} onSave={() => void save()} onCancel={cancel} />;
+            return <CategoryEditor key={category.id} name={name} icon={icon} onIcon={setIcon} system={category.is_system} saving={saving} onName={setName} onSave={() => void save()} onCancel={cancel} />;
           }
           const expenseVisual = expenseVisuals[category.name as keyof typeof expenseVisuals] ?? expenseVisuals.Другое;
-          const IncomeIcon = incomeVisuals[category.name as keyof typeof incomeVisuals] ?? MoreHorizontal;
-          const Icon = isExpense ? expenseVisual.icon : IncomeIcon;
           return (
             <li key={category.id} className="flex items-center gap-2 rounded-lg px-1 py-1.5">
               <span className={`grid size-8 shrink-0 place-items-center rounded-lg ${isExpense ? '' : 'bg-[#173027] text-[#71d28a]'}`} style={isExpense ? { color: expenseVisual.color, background: expenseVisual.background } : undefined}>
-                <Icon className="size-4" aria-hidden="true" />
+                <CategoryIcon icon={category.icon} />
               </span>
               <span className="min-w-0 truncate text-sm text-[#d7e0ea]" title={category.name}>{category.name}</span>
               <span className="ml-auto shrink-0 text-sm font-medium tabular-nums text-[#edf3f9]">{formatCurrency(amount_cents)}</span>
-              {!category.is_system ? (
+              {(
                 <div className="flex shrink-0 gap-1">
                   <SmallButton label={`Изменить категорию ${category.name}`} onClick={() => beginEdit(category)}><Pencil className="size-3.5" /></SmallButton>
-                  <SmallButton danger label={`Удалить категорию ${category.name}`} disabled={saving} onClick={() => void remove(category)}><Trash2 className="size-3.5" /></SmallButton>
+                  {!category.is_system && <SmallButton danger label={`Удалить категорию ${category.name}`} disabled={saving} onClick={() => void remove(category)}><Trash2 className="size-3.5" /></SmallButton>}
                 </div>
-              ) : null}
+              )}
             </li>
           );
         })}
@@ -260,12 +252,13 @@ function StatisticsCard({
   );
 }
 
-function CategoryEditor({ name, saving, onName, onSave, onCancel }: { name: string; saving: boolean; onName: (value: string) => void; onSave: () => void; onCancel: () => void }) {
+function CategoryEditor({ name, icon, onIcon, system = false, saving, onName, onSave, onCancel }: { name: string; icon: string; onIcon: (value: string) => void; system?: boolean; saving: boolean; onName: (value: string) => void; onSave: () => void; onCancel: () => void }) {
   return (
-    <li className="flex gap-2 rounded-lg border border-[#25415d] bg-[#0a1725] p-2.5">
-      <input className="editor-control" value={name} maxLength={100} placeholder="Название категории" aria-label="Название категории" onChange={(event) => onName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') onSave(); }} />
+    <li className="grid grid-cols-[1fr_auto_auto] gap-2 rounded-lg border border-[#25415d] bg-[#0a1725] p-2.5">
+      <input disabled={system || saving} className="editor-control" value={name} maxLength={100} placeholder="Название категории" aria-label="Название категории" onChange={(event) => onName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') onSave(); }} />
       <SmallButton label="Сохранить категорию" disabled={saving} onClick={onSave}><Check className="size-3.5" /></SmallButton>
       <SmallButton label="Отменить" disabled={saving} onClick={onCancel}><X className="size-3.5" /></SmallButton>
+      <IconPicker value={icon} onChange={onIcon} disabled={saving} />
     </li>
   );
 }

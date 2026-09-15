@@ -198,6 +198,7 @@ def create_category(
     ) + 1
     category = Category(
         name=name,
+        icon=payload.icon,
         type=payload.type,
         sort_order=next_order,
         is_system=False,
@@ -224,7 +225,7 @@ def update_category(
     category = session.get(Category, category_id)
     if category is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Категория не найдена")
-    if category.is_system:
+    if category.is_system and normalized_name(payload.name) != category.name:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Системную категорию «Другое» нельзя изменить",
@@ -245,6 +246,8 @@ def update_category(
 
     old_name = category.name
     category.name = name
+    if payload.icon is not None:
+        category.icon = payload.icon
     session.execute(
         update(Transaction)
         .where(Transaction.type == category.type, Transaction.category == old_name)
@@ -547,10 +550,11 @@ def update_transaction(
         transaction.account_id = account.id
         transaction.source = account.name
 
+    category_changed = "category" in changes and changes["category"] != transaction.category
     for field, value in changes.items():
         setattr(transaction, field, value)
 
-    if "category" in changes and transaction.merchant:
+    if category_changed and transaction.merchant and merchant_key(transaction.merchant):
         key = merchant_key(transaction.merchant)
         rule = session.scalar(
             select(CategoryRule).where(

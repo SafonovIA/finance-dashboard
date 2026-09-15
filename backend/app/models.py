@@ -67,6 +67,7 @@ class Category(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100))
+    icon: Mapped[str] = mapped_column(String(40), default="other", server_default="other")
     type: Mapped[TransactionType] = mapped_column(
         Enum(TransactionType, name="transaction_type", create_type=False), index=True
     )
