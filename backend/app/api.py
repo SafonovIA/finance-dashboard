@@ -727,6 +727,7 @@ async def import_excel(
     for transaction in unique_transactions:
         account = accounts_by_name[transaction.source]
         transaction_data = transaction.__dict__.copy()
+        transaction_data["source"] = account.name
         if (transaction.type, transaction.category) not in available_categories:
             transaction_data["category"] = fallback_categories[transaction.type]
         session.add(
@@ -734,7 +735,6 @@ async def import_excel(
                 **transaction_data,
                 import_batch_id=batch.id,
                 account_id=account.id,
-                source=account.name,
             )
         )
     session.commit()
