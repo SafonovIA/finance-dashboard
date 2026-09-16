@@ -209,7 +209,7 @@ function StatisticsCard({
 
       {error ? <p className="mb-3 rounded-md bg-[#2b1720] px-3 py-2 text-xs text-[#ff9ca8]">{error}</p> : null}
 
-      <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+      <ul className="panel-scroll min-h-0 flex-1 space-y-2 overflow-y-auto">
         {editingId === 'new' ? (
           <CategoryEditor name={name} icon={icon} color={iconColor} onColor={setIconColor} onIcon={setIcon} saving={saving} onName={setName} onSave={() => void save()} onCancel={cancel} />
         ) : null}
@@ -342,7 +342,7 @@ function AccountsCard({ accounts, onChanged }: { accounts: Account[]; onChanged:
 
       {error ? <p className="mb-3 rounded-md bg-[#2b1720] px-3 py-2 text-xs text-[#ff9ca8]">{error}</p> : null}
 
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+      <div className="panel-scroll min-h-0 flex-1 space-y-2 overflow-y-auto">
         {editingId === 'new' ? (
           <AccountEditor name={name} balance={balance} saving={saving} onName={setName} onBalance={setBalance} onSave={() => void save()} onCancel={cancel} />
         ) : null}

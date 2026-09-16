@@ -60,6 +60,28 @@
 html {
   background: var(--background);
   font-size: 115%;
+  color-scheme: dark;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #526171 #0d1a29;
+}
+
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: #0d1a29; border-radius: 8px; }
+*::-webkit-scrollbar-thumb { background: #526171; border: 2px solid #0d1a29; border-radius: 8px; }
+*::-webkit-scrollbar-thumb:hover { background: #718093; }
+*::-webkit-scrollbar-corner { background: #0d1a29; }
+
+.panel-scroll {
+  scrollbar-gutter: stable;
+  padding-inline-end: 0.75rem;
+}
+
+[data-slot='table-container'] {
+  scrollbar-gutter: stable;
+  padding-bottom: 0.5rem;
 }
 
 body {
