@@ -37,7 +37,7 @@ function LoadingCards() {
 }
 
 export default function StatisticsPage() {
-  const { selectedMonth, loading: monthsLoading } = useMonth();
+  const { selectedMonth, loading: monthsLoading, statisticsAllTime } = useMonth();
   const [statistics, setStatistics] = useState<Statistics | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Categories>(emptyCategories);
@@ -50,7 +50,7 @@ export default function StatisticsPage() {
       const [accountRows, categoryRows, statisticsData] = await Promise.all([
         requestJson<Account[]>('/api/accounts'),
         requestJson<Categories>('/api/categories'),
-        selectedMonth
+        statisticsAllTime ? requestJson<Statistics>('/api/statistics') : selectedMonth
           ? requestJson<Statistics>(`/api/statistics?month=${selectedMonth}`)
           : Promise.resolve(null),
       ]);
@@ -62,7 +62,7 @@ export default function StatisticsPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedMonth]);
+  }, [selectedMonth, statisticsAllTime]);
 
   useEffect(() => {
     const initialLoad = window.setTimeout(() => void loadPageData(), 0);
@@ -75,12 +75,12 @@ export default function StatisticsPage() {
   }, [loadPageData]);
 
   const expenseRows = useMemo(
-    () => categoryRows(categories.expense, statistics?.expenses ?? []),
-    [categories.expense, statistics?.expenses],
+    () => categoryRows(categories.expense, statistics?.expenses ?? [], statisticsAllTime),
+    [categories.expense, statistics?.expenses, statisticsAllTime],
   );
   const incomeRows = useMemo(
-    () => categoryRows(categories.income, statistics?.incomes ?? []),
-    [categories.income, statistics?.incomes],
+    () => categoryRows(categories.income, statistics?.incomes ?? [], statisticsAllTime),
+    [categories.income, statistics?.incomes, statisticsAllTime],
   );
 
   if (monthsLoading || loading) return <LoadingCards />;
@@ -90,6 +90,7 @@ export default function StatisticsPage() {
     <div className="space-y-5"><section className="grid gap-5 lg:grid-cols-3">
       <StatisticsCard
         title="Категории расходов"
+        sortedByAmount={statisticsAllTime}
         rows={expenseRows}
         totalLabel="Итого расходов"
         total={statistics?.expense_total_cents ?? 0}
@@ -98,6 +99,7 @@ export default function StatisticsPage() {
       />
       <StatisticsCard
         title="Категории доходов"
+        sortedByAmount={statisticsAllTime}
         rows={incomeRows}
         totalLabel="Итого доходов"
         total={statistics?.income_total_cents ?? 0}
@@ -109,12 +111,14 @@ export default function StatisticsPage() {
   );
 }
 
-function categoryRows(categories: Category[], totals: CategoryTotal[]) {
+function categoryRows(categories: Category[], totals: CategoryTotal[], sorted = false) {
   const amounts = new Map(totals.map((item) => [item.category, item.amount_cents]));
-  return categories.map((category) => ({ category, amount_cents: amounts.get(category.name) ?? 0 }));
+  const rows = categories.map((category) => ({ category, amount_cents: amounts.get(category.name) ?? 0 }));
+  return sorted ? rows.sort((a, b) => b.amount_cents - a.amount_cents || a.category.name.localeCompare(b.category.name, 'ru')) : rows;
 }
 
 function StatisticsCard({
+  sortedByAmount = false,
   title,
   rows,
   totalLabel,
@@ -122,6 +126,7 @@ function StatisticsCard({
   tone,
   onChanged,
 }: {
+  sortedByAmount?: boolean;
   title: string;
   rows: { category: Category; amount_cents: number }[];
   totalLabel: string;
@@ -219,8 +224,8 @@ function StatisticsCard({
             return <CategoryEditor key={category.id} name={name} icon={icon} color={iconColor} onColor={setIconColor} onIcon={setIcon} system={category.is_system} saving={saving} onName={setName} onSave={() => void save()} onCancel={cancel} />;
           }
           return (
-            <li key={category.id} {...ordering.dragProps(category.id, saving || editingId !== null)} className={`flex items-center gap-2 rounded-lg px-1 py-1.5 ${ordering.over === category.id ? 'bg-[#17304a] ring-1 ring-[#78b4f4]' : ''}`}>
-              <GripVertical className="size-3.5 shrink-0 text-[#718398]" aria-hidden="true" />
+            <li key={category.id} {...ordering.dragProps(category.id, sortedByAmount || saving || editingId !== null)} className={`flex items-center gap-2 rounded-lg px-1 py-1.5 ${ordering.over === category.id ? 'bg-[#17304a] ring-1 ring-[#78b4f4]' : ''}`}>
+              {!sortedByAmount && <GripVertical className="size-3.5 shrink-0 text-[#718398]" aria-hidden="true" />}
               <span className="grid size-8 shrink-0 place-items-center">
                 <CategoryIcon icon={category.icon} color={category.icon_color} />
               </span>

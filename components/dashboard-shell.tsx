@@ -17,14 +17,12 @@ import { InterfaceSettingsProvider } from '@/components/interface-settings';
 const navigation = [
   { href: '/', label: 'Статистика', icon: BarChart3 },
   { href: '/month', label: 'Месяц', icon: CalendarDays },
-  { href: '/all-time', label: 'За всё время', icon: BarChart3 },
   { href: '/upload', label: 'Загрузка файла', icon: Upload },
 ];
 
 const titles: Record<string, string> = {
   '/': 'Статистика',
   '/month': 'Месяц',
-  '/all-time': 'За всё время',
   '/upload': 'Загрузка файла',
   '/settings': 'Настройки',
 };
@@ -32,7 +30,7 @@ const titles: Record<string, string> = {
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const showMonth = pathname === '/' || pathname === '/month';
-  const { months, selectedMonth, setSelectedMonth, loading } = useMonth();
+  const { months, selectedMonth, setSelectedMonth, loading, statisticsAllTime, setStatisticsAllTime } = useMonth();
 
   return (
     <div className="dashboard-shell bg-background text-foreground md:grid md:grid-cols-[225px_minmax(0,1fr)]">
@@ -86,13 +84,18 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           <div className="flex justify-end">
             {showMonth ? (
               <label className="relative text-xs text-[#8b9bad]">
-                <span className="sr-only">Выберите месяц</span>
+                <span className="sr-only">Выберите период</span>
                 <select
                   className="h-9 appearance-none rounded-lg border border-[#14263a] bg-[#0b1724] py-0 pr-8 pl-3 text-xs text-[#8b9bad] outline-none focus:border-[#315f8d] focus:ring-2 focus:ring-[#4389d8]/20"
-                  value={selectedMonth}
-                  disabled={loading || months.length === 0}
-                  onChange={(event) => setSelectedMonth(event.target.value)}
+                  value={pathname === '/' && statisticsAllTime ? 'all' : selectedMonth}
+                  disabled={loading || (pathname !== '/' && months.length === 0)}
+                  onChange={(event) => {
+                    const period = event.target.value;
+                    if (pathname === '/') setStatisticsAllTime(period === 'all');
+                    if (period !== 'all') setSelectedMonth(period);
+                  }}
                 >
+                  {pathname === '/' ? <option value="all">За всё время</option> : null}
                   {months.length === 0 ? <option value="">Нет данных</option> : null}
                   {months.map((month) => (
                     <option key={month.value} value={month.value}>

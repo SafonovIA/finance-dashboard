@@ -11,6 +11,8 @@ type MonthContextValue = {
   setSelectedMonth: (month: string) => void;
   refreshMonths: (preferredMonth?: string | null) => Promise<void>;
   loading: boolean;
+  statisticsAllTime: boolean;
+  setStatisticsAllTime: (value: boolean) => void;
 };
 
 const MonthContext = createContext<MonthContextValue | null>(null);
@@ -19,6 +21,7 @@ export function MonthProvider({ children }: { children: React.ReactNode }) {
   const [months, setMonths] = useState<MonthOption[]>([]);
   const [selectedMonth, setSelectedMonthState] = useState('');
   const [loading, setLoading] = useState(true);
+  const [statisticsAllTime, setStatisticsAllTime] = useState(false);
 
   const refreshMonths = useCallback(async (preferredMonth?: string | null) => {
     try {
@@ -53,8 +56,8 @@ export function MonthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ months, selectedMonth, setSelectedMonth, refreshMonths, loading }),
-    [months, selectedMonth, setSelectedMonth, refreshMonths, loading],
+    () => ({ months, selectedMonth, setSelectedMonth, refreshMonths, loading, statisticsAllTime, setStatisticsAllTime }),
+    [months, selectedMonth, setSelectedMonth, refreshMonths, loading, statisticsAllTime],
   );
 
   return <MonthContext.Provider value={value}>{children}</MonthContext.Provider>;
