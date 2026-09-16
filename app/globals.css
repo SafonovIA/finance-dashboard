@@ -70,8 +70,20 @@ body {
   font-family: var(--font-geist), Arial, Helvetica, sans-serif;
 }
 
-html[data-interface-size='medium'] { zoom: 1.15; }
-html[data-interface-size='large'] { zoom: 1.3; }
+html { --interface-scale: 1; }
+html[data-interface-size='medium'] { --interface-scale: 1.15; zoom: 1.15; }
+html[data-interface-size='large'] { --interface-scale: 1.3; zoom: 1.3; }
+
+.dashboard-shell {
+  min-height: calc(100dvh / var(--interface-scale));
+}
+
+@media (min-width: 48rem) {
+  .dashboard-sidebar {
+    height: calc(100dvh / var(--interface-scale));
+    overflow: hidden;
+  }
+}
 
 button,
 select,

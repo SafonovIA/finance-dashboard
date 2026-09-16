@@ -33,15 +33,15 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const { months, selectedMonth, setSelectedMonth, loading } = useMonth();
 
   return (
-    <div className="min-h-screen bg-background text-foreground md:grid md:grid-cols-[225px_minmax(0,1fr)]">
-      <aside className="border-b border-border bg-[#091522] md:sticky md:top-0 md:flex md:h-screen md:flex-col md:border-r md:border-b-0">
-        <div className="hidden h-[87px] items-center px-5 md:flex">
+    <div className="dashboard-shell bg-background text-foreground md:grid md:grid-cols-[225px_minmax(0,1fr)]">
+      <aside className="dashboard-sidebar border-b border-border bg-[#091522] md:sticky md:top-0 md:flex md:flex-col md:border-r md:border-b-0">
+        <div className="hidden h-[87px] shrink-0 items-center px-5 md:flex">
           <div className="grid size-9 place-items-center rounded-xl border border-[#22384f] bg-[#0d1d2d] text-[#78b4f4] shadow-[0_0_24px_rgba(67,137,216,0.12)]">
             <CircleDollarSign className="size-[21px]" aria-hidden="true" />
           </div>
         </div>
 
-        <nav aria-label="Основная навигация" className="flex gap-1 overflow-x-auto p-2 md:flex-col md:px-3 md:py-3">
+        <nav aria-label="Основная навигация" className="flex min-h-0 gap-1 overflow-x-auto p-2 md:flex-col md:overflow-y-auto md:px-3 md:py-3">
           {navigation.map(({ href, label, icon: Icon }) => {
             const active = pathname === href;
             return (
@@ -63,7 +63,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="mt-auto p-3">
+        <div className="mt-auto shrink-0 p-3">
           <Link
             href="/settings"
             aria-current={pathname === '/settings' ? 'page' : undefined}
