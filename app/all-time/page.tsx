@@ -11,5 +11,5 @@ export default function AllTimeRedirect() {
     setStatisticsAllTime(true);
     router.replace('/');
   }, [router, setStatisticsAllTime]);
-  return <p className="text-sm text-[#91a2b5]">Переход к статистике за всё время…</p>;
+  return <p className="text-sm text-[#91a2b5]">Переход к статистике за год…</p>;
 }

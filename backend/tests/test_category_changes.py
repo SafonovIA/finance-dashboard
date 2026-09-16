@@ -173,3 +173,11 @@ class CategoryChangesTests(unittest.TestCase):
         self.assertEqual(result.expense_total_cents, 120000)
         self.assertEqual(result.income_total_cents, 30000)
         self.assertEqual(statistics(self.session, "2026-08").expense_total_cents, 50000)
+
+    def test_year_statistics_does_not_include_other_years(self):
+        from backend.app.api import statistics
+        self.session.add(Transaction(occurred_on=date(2025, 12, 31), amount_cents=12345, category="custom", source="test", account_id=self.transaction.account_id, type=TransactionType.expense))
+        self.session.commit()
+        self.assertEqual(statistics(self.session, None, 2026).expense_total_cents, 50000)
+        self.assertEqual(statistics(self.session, None, 2025).expense_total_cents, 12345)
+        self.assertEqual(statistics(self.session, None, 2024).expense_total_cents, 0)

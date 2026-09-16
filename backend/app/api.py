@@ -628,11 +628,14 @@ def delete_transaction(transaction_id: int, session: SessionDependency) -> None:
 def statistics(
     session: SessionDependency,
     month: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}$"),
+    year: Annotated[int | None, Query(ge=1, le=9999)] = None,
 ) -> StatisticsRead:
     statement = select(Transaction).where(Transaction.included_in_analytics.is_(True))
     if month is not None:
         start, end = month_bounds(month)
         statement = statement.where(Transaction.occurred_on.between(start, end))
+    elif year is not None:
+        statement = statement.where(Transaction.occurred_on.between(date(year, 1, 1), date(year, 12, 31)))
     transactions = session.scalars(statement)
 
     categories_by_type = {
@@ -668,7 +671,7 @@ def statistics(
     expense_total = sum(item.amount_cents for item in expenses)
     income_total = sum(item.amount_cents for item in incomes)
     return StatisticsRead(
-        month=month or "all",
+        month=month or (str(year) if year is not None else "all"),
         expenses=expenses,
         incomes=incomes,
         expense_total_cents=expense_total,

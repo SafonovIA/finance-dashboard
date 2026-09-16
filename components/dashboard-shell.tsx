@@ -31,6 +31,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const showMonth = pathname === '/' || pathname === '/month';
   const { months, selectedMonth, setSelectedMonth, loading, statisticsAllTime, setStatisticsAllTime } = useMonth();
+  const selectedYear = selectedMonth.slice(0, 4) || String(new Date().getFullYear());
+  const years = [...new Set([...months.map((month) => month.value.slice(0, 4)), selectedYear])].sort().reverse();
+  const visibleMonths = pathname === '/' ? months.filter((month) => month.value.startsWith(`${selectedYear}-`)) : months;
 
   return (
     <div className="dashboard-shell bg-background text-foreground md:grid md:grid-cols-[225px_minmax(0,1fr)]">
@@ -81,25 +84,35 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           <h1 className="text-sm font-semibold tracking-tight text-[#f2f6fb] sm:text-base">
             {titles[pathname] ?? 'Статистика'}
           </h1>
-          <div className="flex justify-end">
+          <div className="flex flex-wrap justify-end gap-2">
+            {pathname === '/' && <label className="text-xs text-[#8b9bad]">
+              <span className="sr-only">Выберите год</span>
+              <select value={selectedYear} disabled={loading} onChange={(event) => {
+                const yearMonths = months.filter((month) => month.value.startsWith(`${event.target.value}-`));
+                const matching = yearMonths.find((month) => month.value.slice(5) === selectedMonth.slice(5));
+                setSelectedMonth(matching?.value ?? yearMonths[0]?.value ?? `${event.target.value}-01`);
+              }} className="h-9 rounded-lg border border-[#14263a] bg-[#0b1724] px-2 outline-none focus:border-[#315f8d]">
+                {years.map((year) => <option key={year} value={year}>{year}</option>)}
+              </select>
+            </label>}
             {showMonth ? (
               <label className="relative text-xs text-[#8b9bad]">
                 <span className="sr-only">Выберите период</span>
                 <select
                   className="h-9 appearance-none rounded-lg border border-[#14263a] bg-[#0b1724] py-0 pr-8 pl-3 text-xs text-[#8b9bad] outline-none focus:border-[#315f8d] focus:ring-2 focus:ring-[#4389d8]/20"
-                  value={pathname === '/' && statisticsAllTime ? 'all' : selectedMonth}
+                  value={pathname === '/' && statisticsAllTime ? 'year' : selectedMonth}
                   disabled={loading || (pathname !== '/' && months.length === 0)}
                   onChange={(event) => {
                     const period = event.target.value;
-                    if (pathname === '/') setStatisticsAllTime(period === 'all');
-                    if (period !== 'all') setSelectedMonth(period);
+                    if (pathname === '/') setStatisticsAllTime(period === 'year');
+                    if (period !== 'year') setSelectedMonth(period);
                   }}
                 >
-                  {pathname === '/' ? <option value="all">За всё время</option> : null}
+                  {pathname === '/' ? <option value="year">За год</option> : null}
                   {months.length === 0 ? <option value="">Нет данных</option> : null}
-                  {months.map((month) => (
+                  {visibleMonths.map((month) => (
                     <option key={month.value} value={month.value}>
-                      {month.label}
+                      {pathname === '/' ? month.label.replace(/\s+\d{4}$/, '') : month.label}
                     </option>
                   ))}
                 </select>

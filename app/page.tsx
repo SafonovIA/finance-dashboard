@@ -38,6 +38,7 @@ function LoadingCards() {
 
 export default function StatisticsPage() {
   const { selectedMonth, loading: monthsLoading, statisticsAllTime } = useMonth();
+  const selectedYear = selectedMonth.slice(0, 4) || String(new Date().getFullYear());
   const [statistics, setStatistics] = useState<Statistics | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Categories>(emptyCategories);
@@ -50,7 +51,7 @@ export default function StatisticsPage() {
       const [accountRows, categoryRows, statisticsData] = await Promise.all([
         requestJson<Account[]>('/api/accounts'),
         requestJson<Categories>('/api/categories'),
-        statisticsAllTime ? requestJson<Statistics>('/api/statistics') : selectedMonth
+        statisticsAllTime ? requestJson<Statistics>(`/api/statistics?year=${selectedYear}`) : selectedMonth
           ? requestJson<Statistics>(`/api/statistics?month=${selectedMonth}`)
           : Promise.resolve(null),
       ]);
@@ -62,7 +63,7 @@ export default function StatisticsPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedMonth, statisticsAllTime]);
+  }, [selectedMonth, selectedYear, statisticsAllTime]);
 
   useEffect(() => {
     const initialLoad = window.setTimeout(() => void loadPageData(), 0);
@@ -87,7 +88,7 @@ export default function StatisticsPage() {
   if (error) return <p className="rounded-lg border border-[#5b2a32] bg-[#25151d] p-4 text-sm text-[#ff9ca8]">{error}</p>;
 
   return (
-    <div className="space-y-5"><section className="grid gap-5 lg:grid-cols-3">
+    <div className="space-y-5"><section className={`grid gap-5 ${statisticsAllTime ? 'lg:grid-cols-2' : 'lg:grid-cols-3'}`}>
       <StatisticsCard
         title="Категории расходов"
         sortedByAmount={statisticsAllTime}
@@ -106,7 +107,7 @@ export default function StatisticsPage() {
         tone="income"
         onChanged={loadPageData}
       />
-      <AccountsCard accounts={accounts} onChanged={loadPageData} />
+      {!statisticsAllTime && <AccountsCard accounts={accounts} onChanged={loadPageData} />}
     </section><FinanceCharts statistics={statistics} categories={categories} /></div>
   );
 }
