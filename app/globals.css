@@ -70,6 +70,9 @@ body {
   font-family: var(--font-geist), Arial, Helvetica, sans-serif;
 }
 
+html[data-interface-size='medium'] { zoom: 1.15; }
+html[data-interface-size='large'] { zoom: 1.3; }
+
 button,
 select,
 input {

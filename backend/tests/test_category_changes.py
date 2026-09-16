@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.database import Base
 from backend.app.models import Account, Category, CategoryRule, Transaction, TransactionType
-from backend.app.api import update_category, update_transaction, move_category, move_account, list_accounts, place_category, place_account
+from backend.app.api import update_category, update_transaction, move_category, move_account, list_accounts, place_category, place_account, delete_account
 from backend.app.schemas import CategoryUpdate, TransactionUpdate
 from backend.app.importer import parse_transaction
 from backend.tests.test_importer import operation
@@ -127,3 +127,29 @@ class CategoryChangesTests(unittest.TestCase):
         result = list_accounts(self.session)
         self.assertEqual(result[0].id, last.id)
         self.assertEqual({row.id: row.balance_cents for row in initial}, {row.id: row.balance_cents for row in result})
+
+    def test_delete_fallback_account_removes_all_its_operations_only(self):
+        account = self.session.get(Account, self.transaction.account_id)
+        account.name = "Без счёта"
+        other = Account(name="keep", balance_adjustment_cents=123)
+        self.session.add(other)
+        self.session.flush()
+        excluded = Transaction(occurred_on=date(2026, 9, 1), amount_cents=100, category="custom", source=account.name, account_id=account.id, type=TransactionType.expense, included_in_analytics=False)
+        kept = Transaction(occurred_on=date(2026, 9, 1), amount_cents=50, category="custom", source=other.name, account_id=other.id, type=TransactionType.expense)
+        self.session.add_all([excluded, kept])
+        self.session.commit()
+        account_id, kept_id = account.id, kept.id
+        delete_account(account_id, self.session)
+        self.session.expire_all()
+        self.assertIsNone(self.session.get(Account, account_id))
+        self.assertEqual([row.id for row in self.session.scalars(select(Transaction))], [kept_id])
+        self.assertEqual(self.session.get(Account, other.id).balance_adjustment_cents, 123)
+
+    def test_delete_empty_account(self):
+        account = Account(name="empty")
+        self.session.add(account)
+        self.session.commit()
+        account_id = account.id
+        delete_account(account_id, self.session)
+        self.assertIsNone(self.session.get(Account, account_id))
+        self.assertIsNotNone(self.session.get(Transaction, self.transaction.id))

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MonthProvider, useMonth } from '@/components/month-context';
+import { InterfaceSettingsProvider } from '@/components/interface-settings';
 
 const navigation = [
   { href: '/', label: 'Статистика', icon: BarChart3 },
@@ -23,11 +24,12 @@ const titles: Record<string, string> = {
   '/': 'Статистика',
   '/month': 'Месяц',
   '/upload': 'Загрузка файла',
+  '/settings': 'Настройки',
 };
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const showMonth = pathname !== '/upload';
+  const showMonth = pathname === '/' || pathname === '/month';
   const { months, selectedMonth, setSelectedMonth, loading } = useMonth();
 
   return (
@@ -61,14 +63,15 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="mt-auto hidden p-3 md:block">
-          <button
-            type="button"
+        <div className="mt-auto p-3">
+          <Link
+            href="/settings"
+            aria-current={pathname === '/settings' ? 'page' : undefined}
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-[15px] text-[#8999aa] transition-colors hover:bg-[#0f2032] hover:text-[#d8e5f2]"
           >
             <Settings className="size-4" aria-hidden="true" />
             <span>Настройки</span>
-          </button>
+          </Link>
         </div>
       </aside>
 
@@ -108,8 +111,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   return (
-    <MonthProvider>
+    <InterfaceSettingsProvider><MonthProvider>
       <DashboardContent>{children}</DashboardContent>
-    </MonthProvider>
+    </MonthProvider></InterfaceSettingsProvider>
   );
 }

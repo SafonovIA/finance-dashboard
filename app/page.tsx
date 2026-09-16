@@ -311,12 +311,13 @@ function AccountsCard({ accounts, onChanged }: { accounts: Account[]; onChanged:
   };
 
   const remove = async (account: Account) => {
-    const note = account.transaction_count ? ' Связанные операции перейдут в «Без счёта».' : '';
+    const note = ` Все связанные операции (${account.transaction_count}) за все месяцы будут удалены без возможности восстановления и исчезнут из статистики.`;
     if (!window.confirm(`Удалить счёт «${account.name}»?${note}`)) return;
     setSaving(true);
     setError(null);
     try {
       await requestJson<void>(`/api/accounts/${account.id}`, { method: 'DELETE' });
+      window.dispatchEvent(new Event('finance-data-updated'));
       if (editingId === account.id) setEditingId(null);
       await onChanged();
     } catch (requestError) {

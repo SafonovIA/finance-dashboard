@@ -470,29 +470,9 @@ def update_account(
 @router.delete("/accounts/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_account(account_id: int, session: SessionDependency) -> None:
     account = get_account(session, account_id)
-    transaction_count = int(
-        session.scalar(
-            select(func.count(Transaction.id)).where(Transaction.account_id == account.id)
-        )
-        or 0
-    )
-    if transaction_count:
-        if account.name.casefold() == "Без счёта".casefold():
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Счёт «Без счёта» используется операциями и не может быть удалён",
-            )
-        fallback = find_account_by_name(session, "Без счёта")
-        if fallback is None:
-            fallback = Account(name="Без счёта", balance_adjustment_cents=0)
-            session.add(fallback)
-            session.flush()
-        session.execute(
-            update(Transaction)
-            .where(Transaction.account_id == account.id)
-            .values(account_id=fallback.id, source=fallback.name)
-        )
-    session.delete(account)
+    # Delete dependent rows and their account atomically, including excluded imports.
+    session.execute(delete(Transaction).where(Transaction.account_id == account.id))
+    session.execute(delete(Account).where(Account.id == account.id))
     session.commit()
 
 
