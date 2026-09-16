@@ -46,6 +46,6 @@ export function CategorySelect({ categories, value, onChange, all = false, disab
   const selected = categories.find((category) => category.name === value);
   return <Select defaultOpen={defaultOpen} value={value} onValueChange={(next) => { if (next !== null) onChange(next); }} disabled={disabled}>
     <SelectTrigger aria-label={label} className="w-full min-w-[10rem] border-[#24405d] bg-[#091522] text-[#bcc8d5]"><span className="flex items-center gap-2"><CategoryIcon icon={selected?.icon} color={selected?.icon_color} />{selected?.name ?? (all ? 'Все категории' : value)}</span></SelectTrigger>
-    <SelectContent>{all && <SelectItem value="">Все категории</SelectItem>}{categories.map((category) => <SelectItem key={category.id} value={category.name}><CategoryIcon icon={category.icon} color={category.icon_color} />{category.name}</SelectItem>)}</SelectContent>
+    <SelectContent alignItemWithTrigger={false} align="start" side="bottom" className="max-h-[min(20rem,var(--available-height))]">{all && <SelectItem value="">Все категории</SelectItem>}{categories.map((category) => <SelectItem key={category.id} value={category.name}><CategoryIcon icon={category.icon} color={category.icon_color} />{category.name}</SelectItem>)}</SelectContent>
   </Select>;
 }

@@ -374,7 +374,7 @@ function TransactionsTable({
                   {editing ? (
                     <Select defaultOpen={initialField === 'account_id'} value={values.account_id} onValueChange={(account_id) => { if (account_id !== null) setValues({ ...values, account_id }); }} disabled={saving}>
                       <SelectTrigger aria-label="Источник" className="w-full"><span className="truncate">{accounts.find((account) => String(account.id) === values.account_id)?.name}</span></SelectTrigger>
-                      <SelectContent>{accounts.map((account) => <SelectItem key={account.id} value={String(account.id)}>{account.name}</SelectItem>)}</SelectContent>
+                      <SelectContent alignItemWithTrigger={false} align="start" side="bottom" className="max-h-[min(20rem,var(--available-height))]">{accounts.map((account) => <SelectItem key={account.id} value={String(account.id)}>{account.name}</SelectItem>)}</SelectContent>
                     </Select>
                   ) : <FieldButton label="Изменить источник" onClick={() => startEditing(transaction, 'account_id')}>{transaction.source}</FieldButton>}
                 </TableCell>
