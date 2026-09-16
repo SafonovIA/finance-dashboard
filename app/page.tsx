@@ -76,12 +76,12 @@ export default function StatisticsPage() {
   }, [loadPageData]);
 
   const expenseRows = useMemo(
-    () => categoryRows(categories.expense, statistics?.expenses ?? [], statisticsAllTime),
-    [categories.expense, statistics?.expenses, statisticsAllTime],
+    () => categoryRows(categories.expense, statistics?.expenses ?? [], true),
+    [categories.expense, statistics?.expenses],
   );
   const incomeRows = useMemo(
-    () => categoryRows(categories.income, statistics?.incomes ?? [], statisticsAllTime),
-    [categories.income, statistics?.incomes, statisticsAllTime],
+    () => categoryRows(categories.income, statistics?.incomes ?? [], true),
+    [categories.income, statistics?.incomes],
   );
 
   if (monthsLoading || loading) return <LoadingCards />;
@@ -91,7 +91,7 @@ export default function StatisticsPage() {
     <div className="space-y-5"><section className={`grid gap-5 ${statisticsAllTime ? 'lg:grid-cols-2' : 'lg:grid-cols-3'}`}>
       <StatisticsCard
         title="Категории расходов"
-        sortedByAmount={statisticsAllTime}
+        sortedByAmount
         rows={expenseRows}
         totalLabel="Итого расходов"
         total={statistics?.expense_total_cents ?? 0}
@@ -100,7 +100,7 @@ export default function StatisticsPage() {
       />
       <StatisticsCard
         title="Категории доходов"
-        sortedByAmount={statisticsAllTime}
+        sortedByAmount
         rows={incomeRows}
         totalLabel="Итого доходов"
         total={statistics?.income_total_cents ?? 0}
@@ -230,10 +230,10 @@ function StatisticsCard({
               <span className="grid size-8 shrink-0 place-items-center">
                 <CategoryIcon icon={category.icon} color={category.icon_color} />
               </span>
-              <span className="min-w-0 truncate text-sm text-[#d7e0ea]" title={category.name}>{category.name}</span>
-              <span className="ml-auto shrink-0 text-sm font-medium tabular-nums text-[#edf3f9]">{formatCurrency(amount_cents)}</span>
+              <span className="min-w-0 flex-1 truncate text-sm text-[#d7e0ea]" title={category.name}>{category.name}</span>
+              <span className="ml-auto shrink-0 text-right text-sm font-medium whitespace-nowrap tabular-nums text-[#edf3f9]">{formatCurrency(amount_cents)}</span>
               {(
-                <div className="flex shrink-0 gap-1">
+                <div className="grid w-15 shrink-0 grid-cols-2 gap-1">
                   <SmallButton label={`Изменить категорию ${category.name}`} onClick={() => beginEdit(category)}><Pencil className="size-3.5" /></SmallButton>
                   {!category.is_system && <SmallButton danger label={`Удалить категорию ${category.name}`} disabled={saving} onClick={() => void remove(category)}><Trash2 className="size-3.5" /></SmallButton>}
                 </div>
@@ -362,9 +362,9 @@ function AccountsCard({ accounts, onChanged }: { accounts: Account[]; onChanged:
           <div key={account.id} {...ordering.dragProps(account.id, saving || editingId !== null)} className={`flex items-center gap-2 rounded-lg px-1 py-1.5 ${ordering.over === account.id ? 'bg-[#17304a] ring-1 ring-[#78b4f4]' : ''}`}>
             <GripVertical className="size-3.5 shrink-0 text-[#718398]" aria-hidden="true" />
             <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#17253b] text-[#76a8ef]"><Landmark className="size-4" aria-hidden="true" /></span>
-            <span className="min-w-0 truncate text-sm text-[#d7e0ea]" title={account.name}>{account.name}</span>
-            <span className={`ml-auto shrink-0 text-sm font-medium tabular-nums ${account.balance_cents < 0 ? 'text-[#f26868]' : 'text-[#edf3f9]'}`}>{formatCurrency(account.balance_cents)}</span>
-            <div className="flex shrink-0 gap-1">
+            <span className="min-w-0 flex-1 truncate text-sm text-[#d7e0ea]" title={account.name}>{account.name}</span>
+            <span className={`ml-auto shrink-0 text-right text-sm font-medium whitespace-nowrap tabular-nums ${account.balance_cents < 0 ? 'text-[#f26868]' : 'text-[#edf3f9]'}`}>{formatCurrency(account.balance_cents)}</span>
+            <div className="grid w-15 shrink-0 grid-cols-2 gap-1">
               <SmallButton label={`Изменить счёт ${account.name}`} onClick={() => beginEdit(account)}><Pencil className="size-3.5" /></SmallButton>
               <SmallButton danger label={`Удалить счёт ${account.name}`} disabled={saving} onClick={() => void remove(account)}><Trash2 className="size-3.5" /></SmallButton>
             </div>
