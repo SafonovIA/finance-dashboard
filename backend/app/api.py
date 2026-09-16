@@ -627,15 +627,13 @@ def delete_transaction(transaction_id: int, session: SessionDependency) -> None:
 @router.get("/statistics", response_model=StatisticsRead)
 def statistics(
     session: SessionDependency,
-    month: str = Query(pattern=r"^\d{4}-\d{2}$"),
+    month: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}$"),
 ) -> StatisticsRead:
-    start, end = month_bounds(month)
-    transactions = session.scalars(
-        select(Transaction).where(
-            Transaction.occurred_on.between(start, end),
-            Transaction.included_in_analytics.is_(True),
-        )
-    )
+    statement = select(Transaction).where(Transaction.included_in_analytics.is_(True))
+    if month is not None:
+        start, end = month_bounds(month)
+        statement = statement.where(Transaction.occurred_on.between(start, end))
+    transactions = session.scalars(statement)
 
     categories_by_type = {
         TransactionType.expense: [],
@@ -664,10 +662,13 @@ def statistics(
         for category, amount in expense_totals.items()
     ]
     incomes = [CategoryTotal(category=category, amount_cents=amount) for category, amount in income_totals.items()]
+    if month is None:
+        expenses.sort(key=lambda item: (-item.amount_cents, item.category))
+        incomes.sort(key=lambda item: (-item.amount_cents, item.category))
     expense_total = sum(item.amount_cents for item in expenses)
     income_total = sum(item.amount_cents for item in incomes)
     return StatisticsRead(
-        month=month,
+        month=month or "all",
         expenses=expenses,
         incomes=incomes,
         expense_total_cents=expense_total,

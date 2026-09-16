@@ -11,6 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import { useMonth } from '@/components/month-context';
+import { FinanceCharts } from '@/components/finance-charts';
 import { CategoryIcon, ColorPicker, IconPicker } from '@/components/category-icon';
 import {
   formatCurrency,
@@ -86,7 +87,7 @@ export default function StatisticsPage() {
   if (error) return <p className="rounded-lg border border-[#5b2a32] bg-[#25151d] p-4 text-sm text-[#ff9ca8]">{error}</p>;
 
   return (
-    <section className="grid items-start gap-5 lg:grid-cols-3">
+    <div className="space-y-5"><section className="grid gap-5 lg:grid-cols-3">
       <StatisticsCard
         title="Категории расходов"
         rows={expenseRows}
@@ -104,7 +105,7 @@ export default function StatisticsPage() {
         onChanged={loadPageData}
       />
       <AccountsCard accounts={accounts} onChanged={loadPageData} />
-    </section>
+    </section><FinanceCharts statistics={statistics} categories={categories} /></div>
   );
 }
 
@@ -197,7 +198,7 @@ function StatisticsCard({
   };
 
   return (
-    <article className="rounded-xl border border-[#15283b] bg-card p-5 sm:p-6">
+    <article className="flex h-[32rem] min-w-0 flex-col rounded-xl border border-[#15283b] bg-card p-5 sm:p-6">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className={`text-sm font-semibold ${isExpense ? 'text-[#f26868]' : 'text-[#63c978]'}`}>{title}</h2>
         <button type="button" onClick={beginCreate} disabled={saving} className="inline-flex h-7 items-center gap-1 rounded-md border border-[#24405d] px-2 text-[13px] text-[#91b9df] transition-colors hover:bg-[#17304a] disabled:opacity-50">
@@ -208,7 +209,7 @@ function StatisticsCard({
 
       {error ? <p className="mb-3 rounded-md bg-[#2b1720] px-3 py-2 text-xs text-[#ff9ca8]">{error}</p> : null}
 
-      <ul className="max-h-[380px] space-y-2 overflow-y-auto pr-1">
+      <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
         {editingId === 'new' ? (
           <CategoryEditor name={name} icon={icon} color={iconColor} onColor={setIconColor} onIcon={setIcon} saving={saving} onName={setName} onSave={() => void save()} onCancel={cancel} />
         ) : null}
@@ -330,7 +331,7 @@ function AccountsCard({ accounts, onChanged }: { accounts: Account[]; onChanged:
   const total = accounts.reduce((sum, account) => sum + account.balance_cents, 0);
 
   return (
-    <article className="rounded-xl border border-[#15283b] bg-card p-5 sm:p-6">
+    <article className="flex h-[32rem] min-w-0 flex-col rounded-xl border border-[#15283b] bg-card p-5 sm:p-6">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-[#76a8ef]">Счета</h2>
         <button type="button" onClick={beginCreate} disabled={saving} className="inline-flex h-7 items-center gap-1 rounded-md border border-[#24405d] px-2 text-[13px] text-[#91b9df] transition-colors hover:bg-[#17304a] disabled:opacity-50">
@@ -341,7 +342,7 @@ function AccountsCard({ accounts, onChanged }: { accounts: Account[]; onChanged:
 
       {error ? <p className="mb-3 rounded-md bg-[#2b1720] px-3 py-2 text-xs text-[#ff9ca8]">{error}</p> : null}
 
-      <div className="max-h-[380px] space-y-2 overflow-y-auto pr-1">
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
         {editingId === 'new' ? (
           <AccountEditor name={name} balance={balance} saving={saving} onName={setName} onBalance={setBalance} onSave={() => void save()} onCancel={cancel} />
         ) : null}

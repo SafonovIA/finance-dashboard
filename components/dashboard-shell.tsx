@@ -17,12 +17,14 @@ import { InterfaceSettingsProvider } from '@/components/interface-settings';
 const navigation = [
   { href: '/', label: 'Статистика', icon: BarChart3 },
   { href: '/month', label: 'Месяц', icon: CalendarDays },
+  { href: '/all-time', label: 'За всё время', icon: BarChart3 },
   { href: '/upload', label: 'Загрузка файла', icon: Upload },
 ];
 
 const titles: Record<string, string> = {
   '/': 'Статистика',
   '/month': 'Месяц',
+  '/all-time': 'За всё время',
   '/upload': 'Загрузка файла',
   '/settings': 'Настройки',
 };

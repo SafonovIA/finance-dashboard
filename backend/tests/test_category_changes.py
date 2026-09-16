@@ -153,3 +153,23 @@ class CategoryChangesTests(unittest.TestCase):
         delete_account(account_id, self.session)
         self.assertIsNone(self.session.get(Account, account_id))
         self.assertIsNotNone(self.session.get(Transaction, self.transaction.id))
+
+    def test_all_time_statistics_sums_months_sorts_and_excludes_transfers(self):
+        from backend.app.api import statistics
+        from backend.app.models import TransactionKind
+        account_id = self.transaction.account_id
+        for month, amount, category, kind, included, transaction_type in [
+            (9, 80000, "custom", TransactionKind.purchase, True, TransactionType.expense),
+            (9, 10000, "Продукты", TransactionKind.refund, True, TransactionType.expense),
+            (9, 999999, "custom", TransactionKind.internal_transfer, False, TransactionType.expense),
+            (8, 10000, "salary", TransactionKind.income, True, TransactionType.income),
+            (9, 20000, "salary", TransactionKind.income, True, TransactionType.income),
+        ]:
+            self.session.add(Transaction(occurred_on=date(2026, month, 1), amount_cents=amount, category=category, source="test", account_id=account_id, type=transaction_type, kind=kind, included_in_analytics=included))
+        self.session.commit()
+        result = statistics(self.session, None)
+        self.assertEqual(result.month, "all")
+        self.assertEqual([(row.category, row.amount_cents) for row in result.expenses], [("custom", 80000), ("Продукты", 40000)])
+        self.assertEqual(result.expense_total_cents, 120000)
+        self.assertEqual(result.income_total_cents, 30000)
+        self.assertEqual(statistics(self.session, "2026-08").expense_total_cents, 50000)
