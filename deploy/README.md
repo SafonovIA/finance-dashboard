@@ -77,9 +77,12 @@ Origin и cookie входа будут работать неверно.
 ## FirstVDS с уже установленным ISPmanager/Nginx
 
 Не отключайте Nginx и службы ISPmanager ради Caddy: они могут обслуживать
-панель управления. Для `safonov.gosha2016.fvds.ru` используется отдельный
-vhost `deploy/firstvds-nginx.conf`, а существующие конфигурации не меняются.
-В нём есть ограничение частоты запросов к `/api/auth/` и лимит загрузки 16 МБ.
+панель управления. Активный сайт работает по `https://188.120.234.176/`:
+отдельный vhost `deploy/firstvds-ip-nginx.conf` использует IP-сертификат,
+уже установленный ISPmanager в `/usr/local/mgr5/etc/manager.crt`. В нём есть
+ограничение частоты запросов к `/api/auth/` и лимит загрузки 16 МБ. Порт
+панели 1501 и другие конфигурации не менялись. На этом VPS в `.env` задано
+`PUBLIC_BASE_URL=https://188.120.234.176`.
 
 На VPS с 1 ГБ ОЗУ добавлен отдельный swap-файл `/swap-finance` (2 ГБ) и
 `deploy/finance-swap.service`. Это запас на время сборки, не замена увеличению
@@ -88,7 +91,8 @@ vhost `deploy/firstvds-nginx.conf`, а существующие конфигур
 `finance` через локальный Unix-сокет, поэтому строка подключения на этом VPS —
 `postgresql+psycopg:///finance_dashboard`, без пароля и сетевого порта.
 
-Сертификат выдаётся Certbot через webroot `/var/www/finance-acme`:
+Сертификат для технического домена может быть отдельно выдан Certbot через
+webroot `/var/www/finance-acme`:
 
 ```sh
 certbot certonly --webroot -w /var/www/finance-acme \
@@ -97,13 +101,16 @@ certbot certonly --webroot -w /var/www/finance-acme \
   --agree-tos --non-interactive --no-eff-email
 ```
 
-До выдачи сертификата загружается только `deploy/firstvds-acme.conf`;
-он отдаёт ACME-проверку, а остальное — 503. После выдачи его заменяют на
-`deploy/firstvds-nginx.conf`, проверяют `nginx -t` и перезагружают Nginx.
-Certbot timer и `deploy/finance-cert-renew.sh` обновляют сертификат и
-перезагружают Nginx после продления. Для общего домена `fvds.ru` возможен
-лимит выдачи Let's Encrypt, не связанный с ошибкой настройки приложения.
-На текущем VPS `deploy/finance-https-activation.timer` повторяет попытку
-ежечасно в 32 минуты UTC, пока сертификат не получен и Nginx-vhost не
-активирован. Проверить результат: `systemctl status finance-https-activation`
-и `curl -I https://safonov.gosha2016.fvds.ru/login`.
+До выдачи сертификата можно загрузить `deploy/firstvds-acme.conf`;
+он отдаёт ACME-проверку, а остальное — 503. После выдачи нужен отдельный
+vhost `deploy/firstvds-nginx.conf` и обновление `PUBLIC_BASE_URL`/допустимых
+Host в FastAPI. Для общего домена `fvds.ru` на текущий момент исчерпан лимит
+выдачи Let's Encrypt. Созданный для этой попытки
+`finance-https-activation.timer` **отключён**: он не должен заменить рабочий
+IP-vhost позднее. Certbot timer и `deploy/finance-cert-renew.sh` пригодятся
+при использовании доменного сертификата.
+
+IP-сертификат ISPmanager короткоживущий: перед использованием сайта через
+несколько дней проверьте, что панель его продлила, и перезагрузите Nginx для
+подхвата обновлённого файла. Отдельное доменное имя с собственным
+сертификатом надёжнее для долгой эксплуатации.
