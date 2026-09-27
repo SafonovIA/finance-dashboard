@@ -11,7 +11,7 @@ const sizes: { value: InterfaceSize; label: string; description: string }[] = [
 ];
 
 export default function SettingsPage() {
-  const { size, setSize } = useInterfaceSettings();
+  const { size, setSize, loading: sizeLoading, saving: sizeSaving, error: sizeError } = useInterfaceSettings();
   const [email, setEmail] = useState('');
   const [savedEmail, setSavedEmail] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -40,13 +40,14 @@ export default function SettingsPage() {
   return <div className="space-y-5"><section className="rounded-xl border border-[#15283b] bg-card p-6">
     <fieldset>
       <legend className="text-base font-semibold">Размер таблиц и текста</legend>
-      <p className="my-3 text-sm text-[#91a2b5]">Размер применяется ко всему приложению и сохраняется в этом браузере.</p>
+      <p className="my-3 text-sm text-[#91a2b5]">Размер применяется ко всему приложению и сохраняется для вашего аккаунта.</p>
       <div className="flex flex-wrap gap-3">{sizes.map((option) => (
         <label key={option.value} aria-label={option.label} className={`flex cursor-pointer items-center gap-3 rounded-lg border p-4 ${size === option.value ? 'border-[#78b4f4] bg-[#17304a]' : 'border-[#24405d]'}`}>
-          <input type="radio" name="interface-size" value={option.value} checked={size === option.value} onChange={() => setSize(option.value)} className="accent-[#78b4f4]" />
+          <input type="radio" name="interface-size" value={option.value} checked={size === option.value} disabled={sizeLoading || sizeSaving} onChange={() => void setSize(option.value)} className="accent-[#78b4f4]" />
           <span><span className="block text-sm font-medium">{option.label}</span><span className="text-xs text-[#91a2b5]">{option.description}</span></span>
         </label>
       ))}</div>
+      {sizeError && <output className="mt-3 block text-sm text-[#f08e99]">{sizeError}</output>}
     </fieldset>
   </section><section className="rounded-xl border border-[#15283b] bg-card p-6">
     <h2 className="text-base font-semibold">Аккаунт</h2>

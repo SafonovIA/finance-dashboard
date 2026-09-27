@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
 import secrets
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
@@ -30,6 +31,10 @@ class Registration(BaseModel):
 
 class EmailUpdate(BaseModel):
     email: str = Field(min_length=5, max_length=255, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+class InterfaceSettingsUpdate(BaseModel):
+    interface_size: Literal["small", "medium", "large"]
 
 
 DEFAULT_CATEGORIES = (
@@ -171,7 +176,7 @@ def profile(request: Request):
         raise HTTPException(401, "Требуется вход")
     with SessionLocal() as session:
         user = session.get(User, user_id)
-        return {"email": user.email, "username": user.username}
+        return {"email": user.email, "username": user.username, "interface_size": user.interface_size}
 
 
 @router.patch("/profile")
@@ -190,7 +195,19 @@ def update_profile(payload: EmailUpdate, request: Request):
         except IntegrityError as error:
             session.rollback()
             raise HTTPException(409, "Этот email уже зарегистрирован") from error
-        return {"email": user.email, "username": user.username}
+        return {"email": user.email, "username": user.username, "interface_size": user.interface_size}
+
+
+@router.patch("/interface-settings")
+def update_interface_settings(payload: InterfaceSettingsUpdate, request: Request):
+    user_id = current_user_id(request)
+    if user_id is None:
+        raise HTTPException(401, "Требуется вход")
+    with SessionLocal() as session:
+        user = session.get(User, user_id)
+        user.interface_size = payload.interface_size
+        session.commit()
+        return {"interface_size": user.interface_size}
 
 
 @router.post("/logout", status_code=204)

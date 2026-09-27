@@ -58,3 +58,22 @@ class AuthenticationTests(unittest.TestCase):
         self.assertNotEqual(first, second)
         self.assertTrue(auth.verify_password("a secure password 123", first))
         self.assertFalse(auth.verify_password("different password", first))
+
+    def test_interface_size_is_saved_for_each_user(self):
+        first_response = Response()
+        auth.register(auth.Registration(email="first@example.com", password="a secure password 123"), request_with_cookie(), first_response)
+        first_token = first_response.headers["set-cookie"].split("finance_session=", 1)[1].split(";", 1)[0]
+        second_response = Response()
+        auth.register(auth.Registration(email="second@example.com", password="a secure password 456"), request_with_cookie(), second_response)
+        second_token = second_response.headers["set-cookie"].split("finance_session=", 1)[1].split(";", 1)[0]
+
+        self.assertEqual(auth.profile(request_with_cookie(first_token))["interface_size"], "small")
+        self.assertEqual(auth.profile(request_with_cookie(second_token))["interface_size"], "small")
+        auth.update_interface_settings(auth.InterfaceSettingsUpdate(interface_size="large"), request_with_cookie(first_token))
+        auth.update_interface_settings(auth.InterfaceSettingsUpdate(interface_size="medium"), request_with_cookie(second_token))
+        self.assertEqual(auth.profile(request_with_cookie(first_token))["interface_size"], "large")
+        self.assertEqual(auth.profile(request_with_cookie(second_token))["interface_size"], "medium")
+
+        with self.assertRaises(HTTPException) as error:
+            auth.update_interface_settings(auth.InterfaceSettingsUpdate(interface_size="small"), request_with_cookie())
+        self.assertEqual(error.exception.status_code, 401)

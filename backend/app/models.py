@@ -30,6 +30,7 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(100), unique=True)
     email: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
     password_hash: Mapped[str] = mapped_column(String(255))
+    interface_size: Mapped[str] = mapped_column(String(10), default="small", server_default="small")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
