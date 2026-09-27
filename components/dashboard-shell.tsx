@@ -1,8 +1,6 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useRouter } from 'next/navigation';
 import {
   BarChart3,
   CalendarDays,
@@ -31,7 +29,6 @@ const titles: Record<string, string> = {
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
   const showMonth = pathname === '/' || pathname === '/month';
   const { months, selectedMonth, setSelectedMonth, loading, statisticsAllTime, setStatisticsAllTime } = useMonth();
   const selectedYear = selectedMonth.slice(0, 4) || String(new Date().getFullYear());
@@ -51,7 +48,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           {navigation.map(({ href, label, icon: Icon }) => {
             const active = pathname === href;
             return (
-              <Link
+              <a
                 key={href}
                 href={href}
                 className={cn(
@@ -64,21 +61,21 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
               >
                 <Icon className="size-4" aria-hidden="true" />
                 <span>{label}</span>
-              </Link>
+              </a>
             );
           })}
         </nav>
 
         <div className="mt-auto shrink-0 p-3">
-          <Link
+          <a
             href="/settings"
             aria-current={pathname === '/settings' ? 'page' : undefined}
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-[15px] text-[#8999aa] transition-colors hover:bg-[#0f2032] hover:text-[#d8e5f2]"
           >
             <Settings className="size-4" aria-hidden="true" />
             <span>Настройки</span>
-          </Link>
-          <button type="button" onClick={async () => { await requestJson<void>('/api/auth/logout', { method: 'POST' }); router.replace('/login'); router.refresh(); }} className="mt-1 w-full rounded-lg px-3 py-2.5 text-left text-[15px] text-[#8999aa] hover:bg-[#0f2032] hover:text-[#d8e5f2]">Выйти</button>
+          </a>
+          <button type="button" onClick={async () => { await requestJson<void>('/api/auth/logout', { method: 'POST' }); window.location.assign('/login'); }} className="mt-1 w-full rounded-lg px-3 py-2.5 text-left text-[15px] text-[#8999aa] hover:bg-[#0f2032] hover:text-[#d8e5f2]">Выйти</button>
         </div>
       </aside>
 

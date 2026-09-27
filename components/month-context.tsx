@@ -29,7 +29,7 @@ export function MonthProvider({ children }: { children: React.ReactNode }) {
       setMonths(items);
       setSelectedMonthState((current) => {
         const stored = typeof window === 'undefined' ? '' : window.localStorage.getItem('finance-month') ?? '';
-        const candidate = preferredMonth ?? current ?? stored;
+        const candidate = preferredMonth || current || stored;
         return items.some((item) => item.value === candidate) ? candidate : (items[0]?.value ?? '');
       });
     } catch {
