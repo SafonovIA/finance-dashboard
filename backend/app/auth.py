@@ -1,4 +1,4 @@
-"""Single-owner password authentication for the local finance dashboard."""
+"""Email registration and revocable sessions for the finance dashboard."""
 from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
@@ -6,11 +6,11 @@ import secrets
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select, text, update
 from sqlalchemy.exc import IntegrityError
 
 from backend.app.database import SessionLocal
-from backend.app.models import AuthSession, User
+from backend.app.models import AuthSession, User, Account, Category, CategoryRule, ImportBatch, Transaction, TransactionType
 
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -21,6 +21,65 @@ SESSION_LIFETIME = timedelta(days=14)
 class Credentials(BaseModel):
     username: str = Field(min_length=1, max_length=100)
     password: str = Field(min_length=12, max_length=128)
+
+
+class Registration(BaseModel):
+    email: str = Field(min_length=5, max_length=255, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+    password: str = Field(min_length=12, max_length=128)
+
+
+class EmailUpdate(BaseModel):
+    email: str = Field(min_length=5, max_length=255, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+DEFAULT_CATEGORIES = (
+    (TransactionType.expense, "Продукты", "basket", "#f0647d"),
+    (TransactionType.expense, "Транспорт", "bus", "#76a8ef"),
+    (TransactionType.expense, "Жилье", "home", "#d785ee"),
+    (TransactionType.expense, "Развлечения", "game", "#ee7f89"),
+    (TransactionType.expense, "Здоровье", "health", "#efa56f"),
+    (TransactionType.expense, "Другое", "other", "#e9bd65"),
+    (TransactionType.income, "Зарплата", "work", "#71d28a"),
+    (TransactionType.income, "Фриланс", "art", "#71d28a"),
+    (TransactionType.income, "Инвестиции", "growth", "#71d28a"),
+    (TransactionType.income, "Другое", "other", "#71d28a"),
+)
+
+
+def normalize_email(email: str) -> str:
+    return email.strip().casefold()
+
+
+def claim_or_seed_categories(session, user_id: int, first_user: bool) -> None:
+    if first_user:
+        for model in (Account, Category, CategoryRule, ImportBatch, Transaction):
+            session.execute(update(model).where(model.user_id.is_(None)).values(user_id=user_id))
+    if session.scalar(select(func.count(Category.id)).where(Category.user_id == user_id)):
+        return
+    for transaction_type, name, icon, color in DEFAULT_CATEGORIES:
+        order = sum(1 for category in session.new if isinstance(category, Category) and category.type == transaction_type)
+        session.add(Category(user_id=user_id, type=transaction_type, name=name, icon=icon, icon_color=color, sort_order=order, is_system=name == "Другое"))
+
+
+@router.post("/register", status_code=201)
+def register(payload: Registration, request: Request, response: Response):
+    email = normalize_email(payload.email)
+    with SessionLocal() as session:
+        if session.bind.dialect.name == "postgresql":
+            session.execute(text("SELECT pg_advisory_xact_lock(182334291)"))
+        first_user = session.scalar(select(func.count(User.id))) == 0
+        user = User(username=email, email=email, password_hash=hash_password(payload.password))
+        session.add(user)
+        try:
+            session.flush()
+            claim_or_seed_categories(session, user.id, first_user)
+            session.commit()
+        except IntegrityError as error:
+            session.rollback()
+            raise HTTPException(409, "Этот email уже зарегистрирован") from error
+        user_id = user.id
+    set_session(response, user_id, request.url.scheme == "https")
+    return {"email": email}
 
 
 def hash_password(password: str) -> str:
@@ -82,6 +141,8 @@ def setup(payload: Credentials, request: Request, response: Response):
         user = User(username=username, password_hash=hash_password(payload.password))
         session.add(user)
         try:
+            session.flush()
+            claim_or_seed_categories(session, user.id, True)
             session.commit()
         except IntegrityError as error:
             session.rollback()
@@ -94,12 +155,42 @@ def setup(payload: Credentials, request: Request, response: Response):
 @router.post("/login")
 def login(payload: Credentials, request: Request, response: Response):
     with SessionLocal() as session:
-        user = session.scalar(select(User).where(User.username == payload.username.strip()))
+        identity = payload.username.strip()
+        user = session.scalar(select(User).where(or_(User.username == identity, User.email == normalize_email(identity))))
         if user is None or not verify_password(payload.password, user.password_hash):
             raise HTTPException(401, "Неверное имя пользователя или пароль")
         user_id, username = user.id, user.username
     set_session(response, user_id, request.url.scheme == "https")
     return {"username": username}
+
+
+@router.get("/profile")
+def profile(request: Request):
+    user_id = current_user_id(request)
+    if user_id is None:
+        raise HTTPException(401, "Требуется вход")
+    with SessionLocal() as session:
+        user = session.get(User, user_id)
+        return {"email": user.email, "username": user.username}
+
+
+@router.patch("/profile")
+def update_profile(payload: EmailUpdate, request: Request):
+    user_id = current_user_id(request)
+    if user_id is None:
+        raise HTTPException(401, "Требуется вход")
+    with SessionLocal() as session:
+        user = session.get(User, user_id)
+        new_email = normalize_email(payload.email)
+        if session.scalar(select(User.id).where(User.username == new_email, User.id != user_id)):
+            raise HTTPException(409, "Этот email уже зарегистрирован")
+        user.email = new_email
+        try:
+            session.commit()
+        except IntegrityError as error:
+            session.rollback()
+            raise HTTPException(409, "Этот email уже зарегистрирован") from error
+        return {"email": user.email, "username": user.username}
 
 
 @router.post("/logout", status_code=204)

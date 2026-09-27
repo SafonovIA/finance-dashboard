@@ -99,8 +99,10 @@ async def require_login(request: Request, call_next):
     if path.startswith("/api/auth/"):
         return await call_next(request)
     if path.startswith("/api/"):
-        if current_user_id(request) is None:
+        user_id = current_user_id(request)
+        if user_id is None:
             return Response(status_code=401, media_type="application/json", content='{"detail":"Требуется вход"}')
+        request.state.user_id = user_id
     elif request.method in {"GET", "HEAD"} and "text/html" in request.headers.get("accept", ""):
         if path != "/login" and current_user_id(request) is None:
             return RedirectResponse("/login", status_code=303)
