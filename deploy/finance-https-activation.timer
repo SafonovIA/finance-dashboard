@@ -1,0 +1,10 @@
+[Unit]
+Description=Retry finance dashboard HTTPS activation after CA rate limit
+
+[Timer]
+OnCalendar=*-*-* *:32:00 UTC
+Persistent=true
+Unit=finance-https-activation.service
+
+[Install]
+WantedBy=timers.target

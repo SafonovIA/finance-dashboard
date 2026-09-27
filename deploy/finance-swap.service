@@ -1,0 +1,13 @@
+[Unit]
+Description=Emergency swap for finance dashboard on small VPS
+ConditionPathExists=/swap-finance
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/swapon /swap-finance
+ExecStop=/sbin/swapoff /swap-finance
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

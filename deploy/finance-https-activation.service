@@ -1,0 +1,8 @@
+[Unit]
+Description=Obtain finance dashboard HTTPS certificate and activate Nginx vhost
+After=network-online.target nginx.service finance-api.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/finance-activate-https

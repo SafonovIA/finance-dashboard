@@ -195,6 +195,8 @@ def status(request: Request):
 
 @router.post("/setup", status_code=201)
 def setup(payload: Credentials, request: Request, response: Response):
+    if get_settings().app_env == "production":
+        raise HTTPException(404, "Not Found")
     username = payload.username.strip()
     if not username:
         raise HTTPException(422, "Введите имя пользователя")

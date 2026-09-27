@@ -60,6 +60,14 @@ class AuthenticationTests(unittest.TestCase):
         auth.login(credentials, request_with_cookie(), next_response)
         self.assertIn("finance_session=", next_response.headers["set-cookie"])
 
+    def test_setup_is_disabled_in_production(self):
+        with patch.object(auth, "get_settings", return_value=SimpleNamespace(app_env="production")):
+            with self.assertRaises(HTTPException) as error:
+                auth.setup(auth.Credentials(username="owner", password="a secure password 123"), request_with_cookie(), Response())
+        self.assertEqual(error.exception.status_code, 404)
+        with self.sessions() as session:
+            self.assertIsNone(session.scalar(select(User)))
+
     def test_password_hash_has_random_salt(self):
         first = auth.hash_password("a secure password 123")
         second = auth.hash_password("a secure password 123")
@@ -68,9 +76,11 @@ class AuthenticationTests(unittest.TestCase):
         self.assertFalse(auth.verify_password("different password", first))
 
     def test_production_session_cookie_is_secure(self):
+        credentials = auth.Credentials(username="owner", password="a secure password 123")
+        auth.setup(credentials, request_with_cookie(), Response())
         response = Response()
         with patch.object(auth, "get_settings", return_value=SimpleNamespace(app_env="production")):
-            auth.setup(auth.Credentials(username="owner", password="a secure password 123"), request_with_cookie(), response)
+            auth.login(credentials, request_with_cookie(), response)
         self.assertIn("secure", response.headers["set-cookie"].lower())
 
     def test_interface_size_is_saved_for_each_user(self):

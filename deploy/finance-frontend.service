@@ -11,7 +11,7 @@ WorkingDirectory=/opt/finance-dashboard
 Environment=NODE_ENV=production
 Environment=HOST=127.0.0.1
 Environment=PORT=3101
-ExecStart=/usr/bin/node /opt/finance-dashboard/dist/standalone/server.js
+ExecStart=/opt/node-v24.21.0-linux-x64/bin/node /opt/finance-dashboard/dist/standalone/server.js
 Restart=on-failure
 RestartSec=3
 NoNewPrivileges=true
