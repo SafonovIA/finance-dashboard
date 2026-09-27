@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 300" role="img" aria-labelledby="title">
+  <title id="title">Схема месячной таблицы операций</title>
+  <rect width="640" height="300" rx="20" fill="#081523"/>
+  <rect x="24" y="24" width="592" height="252" rx="16" fill="#0d1d2e" stroke="#233b54"/>
+  <text x="48" y="64" fill="#eef5fd" font-size="20" font-family="Arial, sans-serif">Месяц</text>
+  <rect x="468" y="40" width="124" height="36" rx="8" fill="#152b43"/>
+  <text x="530" y="64" text-anchor="middle" fill="#9ac4ec" font-size="15" font-family="Arial, sans-serif">Сентябрь</text>
+  <path d="M48 116h544M48 166h544M48 216h544" stroke="#253b50"/>
+  <text x="51" y="104" fill="#91a7ba" font-size="14" font-family="Arial, sans-serif">Дата</text>
+  <text x="174" y="104" fill="#91a7ba" font-size="14" font-family="Arial, sans-serif">Сумма</text>
+  <text x="286" y="104" fill="#91a7ba" font-size="14" font-family="Arial, sans-serif">Категория</text>
+  <text x="465" y="104" fill="#91a7ba" font-size="14" font-family="Arial, sans-serif">Счёт</text>
+  <text x="51" y="146" fill="#dbe9f6" font-size="15" font-family="Arial, sans-serif">12.09</text>
+  <text x="174" y="146" fill="#dbe9f6" font-size="15" font-family="Arial, sans-serif">1 250 ₽</text>
+  <rect x="273" y="122" width="151" height="34" rx="8" fill="#1a3955" stroke="#67a4d9"/>
+  <text x="287" y="145" fill="#d5e9fb" font-size="15" font-family="Arial, sans-serif">Продукты ⌄</text>
+  <text x="465" y="146" fill="#dbe9f6" font-size="15" font-family="Arial, sans-serif">Основной</text>
+  <text x="51" y="196" fill="#dbe9f6" font-size="15" font-family="Arial, sans-serif">10.09</text>
+  <text x="174" y="196" fill="#dbe9f6" font-size="15" font-family="Arial, sans-serif">490 ₽</text>
+  <text x="286" y="196" fill="#dbe9f6" font-size="15" font-family="Arial, sans-serif">Транспорт</text>
+  <text x="465" y="196" fill="#dbe9f6" font-size="15" font-family="Arial, sans-serif">Основной</text>
+  <circle cx="574" cy="58" r="24" fill="#2b659f"/>
+  <text x="574" y="65" text-anchor="middle" fill="white" font-size="22" font-family="Arial, sans-serif">2</text>
+</svg>

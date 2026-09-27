@@ -15,6 +15,7 @@ from backend.app.api import router
 from backend.app.auth import current_user_id, router as auth_router
 from backend.app.config import PROJECT_ROOT, get_settings
 from backend.app.database import SessionLocal
+from backend.app.feedback import router as feedback_router
 
 
 settings = get_settings()
@@ -94,6 +95,7 @@ if settings.app_env == "production":
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=[urlsplit(settings.public_base_url).hostname, "127.0.0.1", "localhost"])
 app.include_router(router)
 app.include_router(auth_router)
+app.include_router(feedback_router)
 
 
 @app.get("/healthz", include_in_schema=False)

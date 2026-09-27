@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_sender: str = ""
     smtp_use_ssl: bool = False
+    feedback_recipient: str = "safonov.gosha2016@yandex.ru"
 
     @model_validator(mode="after")
     def validate_production(self):

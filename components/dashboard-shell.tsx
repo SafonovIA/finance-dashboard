@@ -6,6 +6,7 @@ import {
   CalendarDays,
   ChevronDown,
   CircleDollarSign,
+  CircleHelp,
   Settings,
   Upload,
 } from 'lucide-react';
@@ -25,6 +26,7 @@ const titles: Record<string, string> = {
   '/month': 'Месяц',
   '/upload': 'Загрузка файла',
   '/settings': 'Настройки',
+  '/help': 'Помощь',
 };
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
@@ -67,6 +69,14 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="mt-auto shrink-0 p-3">
+          <a
+            href="/help"
+            aria-current={pathname === '/help' ? 'page' : undefined}
+            className={cn('flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-[15px] transition-colors hover:bg-[#0f2032] hover:text-[#d8e5f2]', pathname === '/help' ? 'bg-[#132943] text-[#7eb9f7]' : 'text-[#8999aa]')}
+          >
+            <CircleHelp className="size-4" aria-hidden="true" />
+            <span>Помощь</span>
+          </a>
           <a
             href="/settings"
             aria-current={pathname === '/settings' ? 'page' : undefined}

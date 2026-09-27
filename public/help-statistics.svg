@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 300" role="img" aria-labelledby="title">
+  <title id="title">Схема статистики расходов и доходов</title>
+  <rect width="640" height="300" rx="20" fill="#081523"/>
+  <rect x="24" y="24" width="592" height="252" rx="16" fill="#0d1d2e" stroke="#233b54"/>
+  <text x="48" y="64" fill="#eef5fd" font-size="20" font-family="Arial, sans-serif">Статистика</text>
+  <rect x="469" y="40" width="122" height="36" rx="8" fill="#152b43"/>
+  <text x="530" y="64" text-anchor="middle" fill="#9ac4ec" font-size="15" font-family="Arial, sans-serif">За год</text>
+  <rect x="48" y="92" width="255" height="152" rx="11" fill="#122439"/>
+  <rect x="322" y="92" width="269" height="152" rx="11" fill="#122439"/>
+  <text x="67" y="119" fill="#f1919d" font-size="16" font-family="Arial, sans-serif">Расходы</text>
+  <text x="341" y="119" fill="#83d7a2" font-size="16" font-family="Arial, sans-serif">Доходы</text>
+  <text x="67" y="152" fill="#cbd8e6" font-size="13" font-family="Arial, sans-serif">Продукты</text>
+  <rect x="67" y="163" width="194" height="9" rx="4" fill="#e38591"/>
+  <text x="67" y="198" fill="#cbd8e6" font-size="13" font-family="Arial, sans-serif">Транспорт</text>
+  <rect x="67" y="209" width="112" height="9" rx="4" fill="#e38591"/>
+  <text x="341" y="152" fill="#cbd8e6" font-size="13" font-family="Arial, sans-serif">Зарплата</text>
+  <rect x="341" y="163" width="209" height="9" rx="4" fill="#64c78a"/>
+  <text x="341" y="198" fill="#cbd8e6" font-size="13" font-family="Arial, sans-serif">Другое</text>
+  <rect x="341" y="209" width="87" height="9" rx="4" fill="#64c78a"/>
+  <circle cx="574" cy="58" r="24" fill="#2b659f"/>
+  <text x="574" y="65" text-anchor="middle" fill="white" font-size="22" font-family="Arial, sans-serif">3</text>
+</svg>

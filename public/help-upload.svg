@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 300" role="img" aria-labelledby="title">
+  <title id="title">Схема загрузки Excel-файла</title>
+  <rect width="640" height="300" rx="20" fill="#081523"/>
+  <rect x="24" y="24" width="592" height="252" rx="16" fill="#0d1d2e" stroke="#233b54"/>
+  <rect x="51" y="50" width="538" height="198" rx="14" fill="#0a1929" stroke="#4580ba" stroke-width="2" stroke-dasharray="8 7"/>
+  <path d="M320 142v-53m0 0-18 18m18-18 18 18" fill="none" stroke="#7bb9f2" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M279 135c-14 0-23 9-23 21s10 21 23 21h82c14 0 23-9 23-21s-10-21-23-21" fill="none" stroke="#7bb9f2" stroke-width="5" stroke-linecap="round"/>
+  <text x="320" y="208" text-anchor="middle" fill="#e7f0fa" font-size="19" font-family="Arial, sans-serif">Выберите файл Excel</text>
+  <circle cx="574" cy="58" r="24" fill="#2b659f"/>
+  <text x="574" y="65" text-anchor="middle" fill="white" font-size="22" font-family="Arial, sans-serif">1</text>
+</svg>
