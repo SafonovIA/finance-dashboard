@@ -1,0 +1,21 @@
+[Unit]
+Description=Finance dashboard frontend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=finance
+Group=finance
+WorkingDirectory=/opt/finance-dashboard
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=3101
+ExecStart=/usr/bin/node /opt/finance-dashboard/dist/standalone/server.js
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

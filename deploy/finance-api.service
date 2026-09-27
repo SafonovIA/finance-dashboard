@@ -1,0 +1,19 @@
+[Unit]
+Description=Finance dashboard FastAPI
+After=network-online.target postgresql.service finance-frontend.service
+Wants=network-online.target finance-frontend.service
+
+[Service]
+Type=simple
+User=finance
+Group=finance
+WorkingDirectory=/opt/finance-dashboard
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/finance-dashboard/.venv/bin/uvicorn backend.app.main:app --host 127.0.0.1 --port 8001 --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

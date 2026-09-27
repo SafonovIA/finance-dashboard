@@ -8,10 +8,13 @@ from pathlib import Path
 import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import RedirectResponse, Response
+from sqlalchemy import text
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from backend.app.api import router
 from backend.app.auth import current_user_id, router as auth_router
 from backend.app.config import PROJECT_ROOT, get_settings
+from backend.app.database import SessionLocal
 
 
 settings = get_settings()
@@ -85,8 +88,19 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
     lifespan=lifespan,
 )
+if settings.app_env == "production":
+    from urllib.parse import urlsplit
+
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=[urlsplit(settings.public_base_url).hostname, "127.0.0.1", "localhost"])
 app.include_router(router)
 app.include_router(auth_router)
+
+
+@app.get("/healthz", include_in_schema=False)
+def healthz():
+    with SessionLocal() as session:
+        session.execute(text("SELECT 1"))
+    return {"status": "ok"}
 
 
 @app.middleware("http")
@@ -96,7 +110,7 @@ async def require_login(request: Request, call_next):
         origin = request.headers.get("origin")
         if origin and origin != f"{request.url.scheme}://{request.headers.get('host')}":
             return Response(status_code=403, content="Invalid origin")
-    if path.startswith("/api/auth/"):
+    if path == "/healthz" or path.startswith("/api/auth/"):
         return await call_next(request)
     if path.startswith("/api/"):
         user_id = current_user_id(request)

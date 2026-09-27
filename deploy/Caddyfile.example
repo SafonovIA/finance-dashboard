@@ -1,0 +1,6 @@
+budget.example.com {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:8001
+    header Strict-Transport-Security "max-age=31536000"
+    header X-Content-Type-Options "nosniff"
+}

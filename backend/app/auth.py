@@ -211,7 +211,7 @@ def setup(payload: Credentials, request: Request, response: Response):
             session.rollback()
             raise HTTPException(409, "Владелец уже создан") from error
         user_id = user.id
-    set_session(response, user_id, request.url.scheme == "https")
+    set_session(response, user_id, get_settings().app_env == "production" or request.url.scheme == "https")
     return {"username": username}
 
 
@@ -225,7 +225,7 @@ def login(payload: Credentials, request: Request, response: Response):
         if user.email_verification_required:
             raise HTTPException(403, "Подтвердите email перед входом")
         user_id, username = user.id, user.username
-    set_session(response, user_id, request.url.scheme == "https")
+    set_session(response, user_id, get_settings().app_env == "production" or request.url.scheme == "https")
     return {"username": username}
 
 

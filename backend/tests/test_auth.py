@@ -1,5 +1,6 @@
 import unittest
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from fastapi import BackgroundTasks, HTTPException, Response
@@ -65,6 +66,12 @@ class AuthenticationTests(unittest.TestCase):
         self.assertNotEqual(first, second)
         self.assertTrue(auth.verify_password("a secure password 123", first))
         self.assertFalse(auth.verify_password("different password", first))
+
+    def test_production_session_cookie_is_secure(self):
+        response = Response()
+        with patch.object(auth, "get_settings", return_value=SimpleNamespace(app_env="production")):
+            auth.setup(auth.Credentials(username="owner", password="a secure password 123"), request_with_cookie(), response)
+        self.assertIn("secure", response.headers["set-cookie"].lower())
 
     def test_interface_size_is_saved_for_each_user(self):
         first_response = Response()

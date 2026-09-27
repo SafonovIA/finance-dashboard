@@ -35,6 +35,13 @@ const localBindingConfig = {
 };
 
 export default defineConfig(async () => {
+  if (process.env.FINANCE_RUNTIME === 'node') {
+    return {
+      css: { postcss: { plugins: [tailwindcss()] } },
+      plugins: [vinext()],
+    };
+  }
+
   // Keep Wrangler and Miniflare state project-local. These are non-secret tool
   // settings; application environment belongs in ignored `.env*` files.
   process.env.WRANGLER_WRITE_LOGS ??= 'false';
