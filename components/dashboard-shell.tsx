@@ -133,7 +133,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  if (pathname === '/login') return <div className="min-h-screen bg-background text-foreground">{children}</div>;
+  if (pathname === '/login' || pathname === '/verify-email' || pathname === '/reset-password') return <div className="min-h-screen bg-background text-foreground">{children}</div>;
   return (
     <InterfaceSettingsProvider><MonthProvider>
       <DashboardContent>{children}</DashboardContent>

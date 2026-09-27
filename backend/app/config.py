@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     start_frontend: bool = True
     backend_host: str = "127.0.0.1"
     backend_port: int = 8001
+    public_base_url: str = "http://127.0.0.1:8001"
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_sender: str = ""
+    smtp_use_ssl: bool = False
 
     model_config = SettingsConfigDict(
         env_file=PROJECT_ROOT / ".env",

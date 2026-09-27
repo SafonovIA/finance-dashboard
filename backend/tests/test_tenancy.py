@@ -27,6 +27,10 @@ class TenantIsolationTests(unittest.TestCase):
         self.sessions = sessionmaker(self.engine, expire_on_commit=False)
         self.patch = patch.object(auth, "SessionLocal", self.sessions)
         self.patch.start()
+        self.mail_patch = patch.object(auth, "require_mail_config")
+        self.mail_patch.start()
+        self.send_patch = patch.object(auth, "send_link")
+        self.send_patch.start()
         for email in ("a@example.com", "b@example.com"):
             auth.register(auth.Registration(email=email, password="secure password 123"), request(), Response())
         with self.sessions() as session:
@@ -34,6 +38,8 @@ class TenantIsolationTests(unittest.TestCase):
 
     def tearDown(self):
         self.patch.stop()
+        self.mail_patch.stop()
+        self.send_patch.stop()
         self.engine.dispose()
 
     def tenant(self, index: int):
@@ -112,6 +118,10 @@ class TenantIsolationTests(unittest.TestCase):
             for client, email in ((first, "first@example.com"), (second, "second@example.com")):
                 response = client.post("/api/auth/register", json={"email": email, "password": "secure password 123"})
                 self.assertEqual(response.status_code, 201, response.text)
+                self.assertEqual(client.get("/api/accounts").status_code, 401)
+                verification_token = auth.send_link.call_args.args[1]
+                self.assertEqual(client.post("/api/auth/verification/confirm", json={"token": verification_token}).status_code, 200)
+                self.assertEqual(client.post("/api/auth/login", json={"username": email, "password": "secure password 123"}).status_code, 200)
             self.assertEqual(first.post("/api/accounts", json={"name": "Same account", "balance_cents": 0}).status_code, 201)
             self.assertEqual(second.post("/api/accounts", json={"name": "Same account", "balance_cents": 0}).status_code, 201)
             first_account = first.get("/api/accounts").json()[0]["id"]

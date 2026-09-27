@@ -1,14 +1,15 @@
 import unittest
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
-from fastapi import HTTPException, Response
+from fastapi import BackgroundTasks, HTTPException, Response
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from starlette.requests import Request
 
 from backend.app import auth
 from backend.app.database import Base
-from backend.app.models import AuthSession, User
+from backend.app.models import AuthSession, EmailToken, User
 
 
 def request_with_cookie(token: str | None = None) -> Request:
@@ -23,9 +24,15 @@ class AuthenticationTests(unittest.TestCase):
         self.sessions = sessionmaker(self.engine, expire_on_commit=False)
         self.patch = patch.object(auth, "SessionLocal", self.sessions)
         self.patch.start()
+        self.mail_patch = patch.object(auth, "require_mail_config")
+        self.mail_patch.start()
+        self.send_patch = patch.object(auth, "send_link")
+        self.sent = self.send_patch.start()
 
     def tearDown(self):
         self.patch.stop()
+        self.mail_patch.stop()
+        self.send_patch.stop()
         self.engine.dispose()
 
     def test_setup_login_and_logout(self):
@@ -62,9 +69,19 @@ class AuthenticationTests(unittest.TestCase):
     def test_interface_size_is_saved_for_each_user(self):
         first_response = Response()
         auth.register(auth.Registration(email="first@example.com", password="a secure password 123"), request_with_cookie(), first_response)
+        first_verification = self.sent.call_args.args[1]
+        with self.assertRaises(HTTPException) as blocked:
+            auth.login(auth.Credentials(username="first@example.com", password="a secure password 123"), request_with_cookie(), Response())
+        self.assertEqual(blocked.exception.status_code, 403)
+        auth.confirm_verification(auth.EmailLinkToken(token=first_verification), BackgroundTasks())
+        first_response = Response()
+        auth.login(auth.Credentials(username="first@example.com", password="a secure password 123"), request_with_cookie(), first_response)
         first_token = first_response.headers["set-cookie"].split("finance_session=", 1)[1].split(";", 1)[0]
         second_response = Response()
         auth.register(auth.Registration(email="second@example.com", password="a secure password 456"), request_with_cookie(), second_response)
+        auth.confirm_verification(auth.EmailLinkToken(token=self.sent.call_args.args[1]), BackgroundTasks())
+        second_response = Response()
+        auth.login(auth.Credentials(username="second@example.com", password="a secure password 456"), request_with_cookie(), second_response)
         second_token = second_response.headers["set-cookie"].split("finance_session=", 1)[1].split(";", 1)[0]
 
         self.assertEqual(auth.profile(request_with_cookie(first_token))["interface_size"], "small")
@@ -77,3 +94,66 @@ class AuthenticationTests(unittest.TestCase):
         with self.assertRaises(HTTPException) as error:
             auth.update_interface_settings(auth.InterfaceSettingsUpdate(interface_size="small"), request_with_cookie())
         self.assertEqual(error.exception.status_code, 401)
+
+    def test_password_reset_requires_verified_email_and_revokes_sessions(self):
+        auth.register(auth.Registration(email="first@example.com", password="a secure password 123"), request_with_cookie(), Response())
+        tasks = BackgroundTasks()
+        auth.request_password_reset(auth.EmailAddress(email="first@example.com"), tasks)
+        self.assertEqual(len(tasks.tasks), 0)
+        auth.confirm_verification(auth.EmailLinkToken(token=self.sent.call_args.args[1]), BackgroundTasks())
+        login_response = Response()
+        auth.login(auth.Credentials(username="first@example.com", password="a secure password 123"), request_with_cookie(), login_response)
+        login_token = login_response.headers["set-cookie"].split("finance_session=", 1)[1].split(";", 1)[0]
+        unknown_tasks = BackgroundTasks()
+        auth.request_password_reset(auth.EmailAddress(email="unknown@example.com"), unknown_tasks)
+        self.assertEqual(len(unknown_tasks.tasks), 0)
+        tasks = BackgroundTasks()
+        auth.request_password_reset(auth.EmailAddress(email="first@example.com"), tasks)
+        reset_token = tasks.tasks[0].args[1]
+        auth.confirm_password_reset(auth.PasswordReset(token=reset_token, new_password="a different password 456"))
+        self.assertIsNone(auth.current_user_id(request_with_cookie(login_token)))
+        with self.assertRaises(HTTPException):
+            auth.confirm_password_reset(auth.PasswordReset(token=reset_token, new_password="another password 456"))
+        with self.assertRaises(HTTPException):
+            auth.login(auth.Credentials(username="first@example.com", password="a secure password 123"), request_with_cookie(), Response())
+        auth.login(auth.Credentials(username="first@example.com", password="a different password 456"), request_with_cookie(), Response())
+
+    def test_email_change_requires_password_and_confirmation(self):
+        auth.setup(auth.Credentials(username="owner", password="a secure password 123"), request_with_cookie(), Response())
+        login_response = Response()
+        auth.login(auth.Credentials(username="owner", password="a secure password 123"), request_with_cookie(), login_response)
+        token = login_response.headers["set-cookie"].split("finance_session=", 1)[1].split(";", 1)[0]
+        with self.assertRaises(HTTPException):
+            auth.update_profile(auth.EmailUpdate(email="new@example.com", current_password="wrong"), request_with_cookie(token))
+        auth.update_profile(auth.EmailUpdate(email="new@example.com", current_password="a secure password 123"), request_with_cookie(token))
+        self.assertIsNone(auth.profile(request_with_cookie(token))["email"])
+        auth.confirm_verification(auth.EmailLinkToken(token=self.sent.call_args.args[1]), BackgroundTasks())
+        self.assertEqual(auth.profile(request_with_cookie(token))["email"], "new@example.com")
+
+    def test_expired_verification_link_cannot_be_used_twice(self):
+        auth.register(auth.Registration(email="first@example.com", password="a secure password 123"), request_with_cookie(), Response())
+        token = self.sent.call_args.args[1]
+        with self.sessions() as session:
+            row = session.scalar(select(EmailToken))
+            row.expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+            session.commit()
+        with self.assertRaises(HTTPException) as expired:
+            auth.confirm_verification(auth.EmailLinkToken(token=token), BackgroundTasks())
+        self.assertEqual(expired.exception.status_code, 400)
+        with self.sessions() as session:
+            session.scalar(select(EmailToken)).expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+            session.commit()
+        auth.confirm_verification(auth.EmailLinkToken(token=token), BackgroundTasks())
+        with self.assertRaises(HTTPException):
+            auth.confirm_verification(auth.EmailLinkToken(token=token), BackgroundTasks())
+
+    def test_password_change_requires_old_password_and_revokes_session(self):
+        response = Response()
+        auth.setup(auth.Credentials(username="owner", password="a secure password 123"), request_with_cookie(), response)
+        token = response.headers["set-cookie"].split("finance_session=", 1)[1].split(";", 1)[0]
+        with self.assertRaises(HTTPException) as denied:
+            auth.change_password(auth.PasswordChange(current_password="wrong", new_password="a different password 456"), request_with_cookie(token), Response())
+        self.assertEqual(denied.exception.status_code, 403)
+        auth.change_password(auth.PasswordChange(current_password="a secure password 123", new_password="a different password 456"), request_with_cookie(token), Response())
+        self.assertIsNone(auth.current_user_id(request_with_cookie(token)))
+        auth.login(auth.Credentials(username="owner", password="a different password 456"), request_with_cookie(), Response())

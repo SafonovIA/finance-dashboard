@@ -104,9 +104,13 @@ async def require_login(request: Request, call_next):
             return Response(status_code=401, media_type="application/json", content='{"detail":"Требуется вход"}')
         request.state.user_id = user_id
     elif request.method in {"GET", "HEAD"} and "text/html" in request.headers.get("accept", ""):
-        if path != "/login" and current_user_id(request) is None:
+        if path not in {"/login", "/verify-email", "/reset-password"} and current_user_id(request) is None:
             return RedirectResponse("/login", status_code=303)
-    return await call_next(request)
+    response = await call_next(request)
+    if path in {"/verify-email", "/reset-password"}:
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @app.api_route(
