@@ -32,7 +32,8 @@ export function InterfaceSettingsProvider({ children }: { children: React.ReactN
   };
   useEffect(() => {
     let active = true;
-    document.documentElement.dataset.interfaceSize = 'small';
+    const initialSize = document.documentElement.dataset.interfaceSize;
+    if (isInterfaceSize(initialSize)) updateSize(initialSize);
     void requestJson<{ interface_size: string }>('/api/auth/profile')
       .then((profile) => {
         if (active) applySize(isInterfaceSize(profile.interface_size) ? profile.interface_size : 'small');
@@ -45,7 +46,6 @@ export function InterfaceSettingsProvider({ children }: { children: React.ReactN
       });
     return () => {
       active = false;
-      document.documentElement.dataset.interfaceSize = 'small';
     };
   }, []);
 

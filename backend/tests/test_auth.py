@@ -101,15 +101,23 @@ class AuthenticationTests(unittest.TestCase):
         auth.login(auth.Credentials(username="second@example.com", password="a secure password 456"), request_with_cookie(), second_response)
         second_token = second_response.headers["set-cookie"].split("finance_session=", 1)[1].split(";", 1)[0]
 
-        self.assertEqual(auth.profile(request_with_cookie(first_token))["interface_size"], "small")
-        self.assertEqual(auth.profile(request_with_cookie(second_token))["interface_size"], "small")
-        auth.update_interface_settings(auth.InterfaceSettingsUpdate(interface_size="large"), request_with_cookie(first_token))
-        auth.update_interface_settings(auth.InterfaceSettingsUpdate(interface_size="medium"), request_with_cookie(second_token))
-        self.assertEqual(auth.profile(request_with_cookie(first_token))["interface_size"], "large")
-        self.assertEqual(auth.profile(request_with_cookie(second_token))["interface_size"], "medium")
+        self.assertEqual(auth.profile(request_with_cookie(first_token), Response())["interface_size"], "small")
+        self.assertEqual(auth.profile(request_with_cookie(second_token), Response())["interface_size"], "small")
+        first_update_response = Response()
+        auth.update_interface_settings(auth.InterfaceSettingsUpdate(interface_size="large"), request_with_cookie(first_token), first_update_response)
+        self.assertIn("finance_interface_size=large", first_update_response.headers["set-cookie"])
+        auth.update_interface_settings(auth.InterfaceSettingsUpdate(interface_size="medium"), request_with_cookie(second_token), Response())
+        self.assertEqual(auth.profile(request_with_cookie(first_token), Response())["interface_size"], "large")
+        self.assertEqual(auth.profile(request_with_cookie(second_token), Response())["interface_size"], "medium")
+        first_profile_response = Response()
+        auth.profile(request_with_cookie(first_token), first_profile_response)
+        self.assertIn("finance_interface_size=large", first_profile_response.headers["set-cookie"])
+        new_login_response = Response()
+        auth.login(auth.Credentials(username="first@example.com", password="a secure password 123"), request_with_cookie(), new_login_response)
+        self.assertTrue(any(b"finance_interface_size=large" in value for key, value in new_login_response.raw_headers if key == b"set-cookie"))
 
         with self.assertRaises(HTTPException) as error:
-            auth.update_interface_settings(auth.InterfaceSettingsUpdate(interface_size="small"), request_with_cookie())
+            auth.update_interface_settings(auth.InterfaceSettingsUpdate(interface_size="small"), request_with_cookie(), Response())
         self.assertEqual(error.exception.status_code, 401)
 
     def test_password_reset_requires_verified_email_and_revokes_sessions(self):
@@ -143,9 +151,9 @@ class AuthenticationTests(unittest.TestCase):
         with self.assertRaises(HTTPException):
             auth.update_profile(auth.EmailUpdate(email="new@example.com", current_password="wrong"), request_with_cookie(token))
         auth.update_profile(auth.EmailUpdate(email="new@example.com", current_password="a secure password 123"), request_with_cookie(token))
-        self.assertIsNone(auth.profile(request_with_cookie(token))["email"])
+        self.assertIsNone(auth.profile(request_with_cookie(token), Response())["email"])
         auth.confirm_verification(auth.EmailLinkToken(token=self.sent.call_args.args[1]), BackgroundTasks())
-        self.assertEqual(auth.profile(request_with_cookie(token))["email"], "new@example.com")
+        self.assertEqual(auth.profile(request_with_cookie(token), Response())["email"], "new@example.com")
 
     def test_expired_verification_link_cannot_be_used_twice(self):
         auth.register(auth.Registration(email="first@example.com", password="a secure password 123"), request_with_cookie(), Response())

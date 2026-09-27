@@ -19,6 +19,7 @@ from backend.app.models import AuthSession, EmailToken, User, Account, Category,
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 COOKIE_NAME = "finance_session"
+SIZE_COOKIE_NAME = "finance_interface_size"
 SESSION_LIFETIME = timedelta(days=14)
 VERIFICATION_LIFETIME = timedelta(hours=24)
 RESET_LIFETIME = timedelta(minutes=30)
@@ -186,6 +187,17 @@ def set_session(response: Response, user_id: int, secure: bool) -> None:
     response.set_cookie(COOKIE_NAME, token, max_age=int(SESSION_LIFETIME.total_seconds()), httponly=True, secure=secure, samesite="strict", path="/")
 
 
+def set_size_cookie(response: Response, size: str, secure: bool) -> None:
+    response.set_cookie(
+        SIZE_COOKIE_NAME,
+        size if size in {"small", "medium", "large"} else "small",
+        max_age=int(SESSION_LIFETIME.total_seconds()),
+        secure=secure,
+        samesite="strict",
+        path="/",
+    )
+
+
 @router.get("/status")
 def status(request: Request):
     with SessionLocal() as session:
@@ -214,6 +226,7 @@ def setup(payload: Credentials, request: Request, response: Response):
             raise HTTPException(409, "Владелец уже создан") from error
         user_id = user.id
     set_session(response, user_id, get_settings().app_env == "production" or request.url.scheme == "https")
+    set_size_cookie(response, "small", get_settings().app_env == "production" or request.url.scheme == "https")
     return {"username": username}
 
 
@@ -226,18 +239,20 @@ def login(payload: Credentials, request: Request, response: Response):
             raise HTTPException(401, "Неверное имя пользователя или пароль")
         if user.email_verification_required:
             raise HTTPException(403, "Подтвердите email перед входом")
-        user_id, username = user.id, user.username
+        user_id, username, interface_size = user.id, user.username, user.interface_size
     set_session(response, user_id, get_settings().app_env == "production" or request.url.scheme == "https")
+    set_size_cookie(response, interface_size, get_settings().app_env == "production" or request.url.scheme == "https")
     return {"username": username}
 
 
 @router.get("/profile")
-def profile(request: Request):
+def profile(request: Request, response: Response):
     user_id = current_user_id(request)
     if user_id is None:
         raise HTTPException(401, "Требуется вход")
     with SessionLocal() as session:
         user = session.get(User, user_id)
+        set_size_cookie(response, user.interface_size, get_settings().app_env == "production" or request.url.scheme == "https")
         return {"email": user.email, "username": user.username, "interface_size": user.interface_size, "email_verified": user.email_verified_at is not None}
 
 
@@ -328,6 +343,7 @@ def change_password(payload: PasswordChange, request: Request, response: Respons
         session.execute(delete(EmailToken).where(EmailToken.user_id == user_id, EmailToken.purpose == "reset_password"))
         session.commit()
     response.delete_cookie(COOKIE_NAME, path="/")
+    response.delete_cookie(SIZE_COOKIE_NAME, path="/")
 
 
 @router.post("/password/reset/request")
@@ -362,7 +378,7 @@ def confirm_password_reset(payload: PasswordReset):
 
 
 @router.patch("/interface-settings")
-def update_interface_settings(payload: InterfaceSettingsUpdate, request: Request):
+def update_interface_settings(payload: InterfaceSettingsUpdate, request: Request, response: Response):
     user_id = current_user_id(request)
     if user_id is None:
         raise HTTPException(401, "Требуется вход")
@@ -370,6 +386,7 @@ def update_interface_settings(payload: InterfaceSettingsUpdate, request: Request
         user = session.get(User, user_id)
         user.interface_size = payload.interface_size
         session.commit()
+        set_size_cookie(response, user.interface_size, get_settings().app_env == "production" or request.url.scheme == "https")
         return {"interface_size": user.interface_size}
 
 
@@ -383,3 +400,4 @@ def logout(request: Request, response: Response):
                 session.delete(row)
                 session.commit()
     response.delete_cookie(COOKIE_NAME, path="/")
+    response.delete_cookie(SIZE_COOKIE_NAME, path="/")
