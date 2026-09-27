@@ -7,9 +7,10 @@ from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import Response
+from fastapi.responses import RedirectResponse, Response
 
 from backend.app.api import router
+from backend.app.auth import current_user_id, router as auth_router
 from backend.app.config import PROJECT_ROOT, get_settings
 
 
@@ -85,6 +86,25 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.include_router(router)
+app.include_router(auth_router)
+
+
+@app.middleware("http")
+async def require_login(request: Request, call_next):
+    path = request.url.path
+    if request.method not in {"GET", "HEAD", "OPTIONS"}:
+        origin = request.headers.get("origin")
+        if origin and origin != f"{request.url.scheme}://{request.headers.get('host')}":
+            return Response(status_code=403, content="Invalid origin")
+    if path.startswith("/api/auth/"):
+        return await call_next(request)
+    if path.startswith("/api/"):
+        if current_user_id(request) is None:
+            return Response(status_code=401, media_type="application/json", content='{"detail":"Требуется вход"}')
+    elif request.method in {"GET", "HEAD"} and "text/html" in request.headers.get("accept", ""):
+        if path != "/login" and current_user_id(request) is None:
+            return RedirectResponse("/login", status_code=303)
+    return await call_next(request)
 
 
 @app.api_route(

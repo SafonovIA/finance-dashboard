@@ -88,6 +88,9 @@ export type ImportResult = {
 export async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { cache: 'no-store', ...init });
   if (!response.ok) {
+    if (response.status === 401 && !url.startsWith('/api/auth/') && typeof window !== 'undefined') {
+      window.location.assign('/login');
+    }
     let detail = 'Не удалось выполнить запрос';
     try {
       const body = (await response.json()) as { detail?: string | { msg?: string }[] };

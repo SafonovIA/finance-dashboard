@@ -372,7 +372,7 @@ function TransactionsTable({
                 </TableCell>
                 <TableCell className="h-10 max-w-[207px] px-2 py-1.5 text-[#bcc8d5]">
                   {editing ? (
-                    <Select defaultOpen={initialField === 'account_id'} value={values.account_id} onValueChange={(account_id) => { if (account_id !== null) setValues({ ...values, account_id }); }} disabled={saving}>
+                    <Select modal={false} defaultOpen={initialField === 'account_id'} value={values.account_id} onValueChange={(account_id) => { if (account_id !== null) setValues({ ...values, account_id }); }} disabled={saving}>
                       <SelectTrigger aria-label="Источник" className="w-full"><span className="truncate">{accounts.find((account) => String(account.id) === values.account_id)?.name}</span></SelectTrigger>
                       <SelectContent alignItemWithTrigger={false} align="start" side="bottom" className="max-h-[min(20rem,var(--available-height))]">{accounts.map((account) => <SelectItem key={account.id} value={String(account.id)}>{account.name}</SelectItem>)}</SelectContent>
                     </Select>
