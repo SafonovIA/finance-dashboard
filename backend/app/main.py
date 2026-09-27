@@ -139,25 +139,25 @@ async def frontend_proxy(path: str, request: Request) -> Response:
 
     try:
         async with httpx.AsyncClient(follow_redirects=False, timeout=30.0) as client:
-            upstream = await client.request(
+            async with client.stream(
                 request.method,
                 target_url,
                 params=request.query_params,
                 content=await request.body(),
                 headers=headers,
-            )
+            ) as upstream:
+                content = b"".join([chunk async for chunk in upstream.aiter_raw()])
+                blocked_headers = {"content-length", "transfer-encoding", "connection"}
+                response_headers = {
+                    key: value
+                    for key, value in upstream.headers.items()
+                    if key.lower() not in blocked_headers
+                }
+                return Response(
+                    content=content,
+                    status_code=upstream.status_code,
+                    headers=response_headers,
+                    media_type=upstream.headers.get("content-type"),
+                )
     except httpx.RequestError as error:
         raise HTTPException(status_code=503, detail="Frontend is unavailable") from error
-
-    blocked_headers = {"content-encoding", "content-length", "transfer-encoding", "connection"}
-    response_headers = {
-        key: value
-        for key, value in upstream.headers.items()
-        if key.lower() not in blocked_headers
-    }
-    return Response(
-        content=upstream.content,
-        status_code=upstream.status_code,
-        headers=response_headers,
-        media_type=upstream.headers.get("content-type"),
-    )
