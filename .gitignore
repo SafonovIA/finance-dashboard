@@ -37,6 +37,10 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .mypy_cache/
+*.db
+*.sqlite
+*.sqlite3
+*.dump
 
 # deployment and generated files
 .vercel

@@ -29,7 +29,9 @@
     "build/**",
     "dist/**",
     "coverage/**",
-    "next-env.d.ts"
+    "next-env.d.ts",
+    "components/ui/**",
+    "hooks/use-mobile.ts"
   ],
   "rules": {
     "no-array-constructor": "error",
@@ -44,6 +46,7 @@
     "react/react-compiler": "error",
     "react/require-render-return": "error",
     "react/rules-of-hooks": "error",
+    "nextjs/no-html-link-for-pages": "off",
     "typescript/ban-ts-comment": "error",
     "typescript/no-deprecated": "error",
     "typescript/no-empty-object-type": "error",

@@ -1,5 +1,5 @@
 {
-  "name": "sites-project",
+  "name": "finance-dashboard",
   "version": "0.1.0",
   "private": true,
   "engines": {
@@ -12,6 +12,7 @@
     "start": "wrangler dev --config dist/server/wrangler.json",
     "start:node": "node dist/standalone/server.js",
     "lint": "oxlint",
+    "typecheck": "tsc --noEmit --incremental false",
     "format": "oxfmt"
   },
   "dependencies": {
