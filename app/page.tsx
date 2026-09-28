@@ -204,8 +204,8 @@ function StatisticsCard({
   };
 
   return (
-    <article className="flex h-[32rem] min-w-0 flex-col rounded-xl border border-[#15283b] bg-card p-5 sm:p-6">
-      <div className="mb-4 flex items-center justify-between gap-3">
+    <article className="flex min-w-0 flex-col rounded-xl border border-[#15283b] bg-card p-4 sm:p-6 lg:h-[32rem]">
+      <div className="finance-card-header mb-4 flex items-center justify-between gap-3">
         <h2 className={`text-sm font-semibold ${isExpense ? 'text-[#f26868]' : 'text-[#63c978]'}`}>{title}</h2>
         <button type="button" onClick={beginCreate} disabled={saving} className="inline-flex h-7 items-center gap-1 rounded-md border border-[#24405d] px-2 text-[13px] text-[#91b9df] transition-colors hover:bg-[#17304a] disabled:opacity-50">
           <Plus className="size-3.5" aria-hidden="true" />
@@ -215,7 +215,7 @@ function StatisticsCard({
 
       {error ? <p className="mb-3 rounded-md bg-[#2b1720] px-3 py-2 text-xs text-[#ff9ca8]">{error}</p> : null}
 
-      <ul className="panel-scroll min-h-0 flex-1 space-y-2 overflow-y-auto">
+      <ul className="panel-scroll min-h-0 flex-1 space-y-2 lg:overflow-y-auto">
         {editingId === 'new' ? (
           <CategoryEditor name={name} icon={icon} color={iconColor} onColor={setIconColor} onIcon={setIcon} saving={saving} onName={setName} onSave={() => void save()} onCancel={cancel} />
         ) : null}
@@ -225,15 +225,15 @@ function StatisticsCard({
             return <CategoryEditor key={category.id} name={name} icon={icon} color={iconColor} onColor={setIconColor} onIcon={setIcon} system={category.is_system} saving={saving} onName={setName} onSave={() => void save()} onCancel={cancel} />;
           }
           return (
-            <li key={category.id} {...ordering.dragProps(category.id, sortedByAmount || saving || editingId !== null)} className={`flex items-center gap-2 rounded-lg px-1 py-1.5 ${ordering.over === category.id ? 'bg-[#17304a] ring-1 ring-[#78b4f4]' : ''}`}>
+            <li key={category.id} {...ordering.dragProps(category.id, sortedByAmount || saving || editingId !== null)} className={`finance-summary-row flex items-center gap-2 rounded-lg px-1 py-1.5 ${ordering.over === category.id ? 'bg-[#17304a] ring-1 ring-[#78b4f4]' : ''}`}>
               {!sortedByAmount && <GripVertical className="size-3.5 shrink-0 text-[#718398]" aria-hidden="true" />}
               <span className="grid size-8 shrink-0 place-items-center">
                 <CategoryIcon icon={category.icon} color={category.icon_color} />
               </span>
-              <span className="min-w-0 flex-1 truncate text-sm text-[#d7e0ea]" title={category.name}>{category.name}</span>
-              <span className="ml-auto shrink-0 text-right text-sm font-medium whitespace-nowrap tabular-nums text-[#edf3f9]">{formatCurrency(amount_cents)}</span>
+              <span className="finance-summary-name min-w-0 flex-1 truncate text-sm text-[#d7e0ea]" title={category.name}>{category.name}</span>
+              <span className="finance-summary-amount ml-auto shrink-0 text-right text-sm font-medium whitespace-nowrap tabular-nums text-[#edf3f9]">{formatCurrency(amount_cents)}</span>
               {(
-                <div className="grid w-15 shrink-0 grid-cols-2 gap-1">
+                <div className="finance-summary-actions grid w-15 shrink-0 grid-cols-2 gap-1">
                   <SmallButton label={`Изменить категорию ${category.name}`} onClick={() => beginEdit(category)}><Pencil className="size-3.5" /></SmallButton>
                   {!category.is_system && <SmallButton danger label={`Удалить категорию ${category.name}`} disabled={saving} onClick={() => void remove(category)}><Trash2 className="size-3.5" /></SmallButton>}
                 </div>
@@ -337,8 +337,8 @@ function AccountsCard({ accounts, onChanged }: { accounts: Account[]; onChanged:
   const total = accounts.reduce((sum, account) => sum + account.balance_cents, 0);
 
   return (
-    <article className="flex h-[32rem] min-w-0 flex-col rounded-xl border border-[#15283b] bg-card p-5 sm:p-6">
-      <div className="mb-4 flex items-center justify-between gap-3">
+    <article className="flex min-w-0 flex-col rounded-xl border border-[#15283b] bg-card p-4 sm:p-6 lg:h-[32rem]">
+      <div className="finance-card-header mb-4 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-[#76a8ef]">Счета</h2>
         <button type="button" onClick={beginCreate} disabled={saving} className="inline-flex h-7 items-center gap-1 rounded-md border border-[#24405d] px-2 text-[13px] text-[#91b9df] transition-colors hover:bg-[#17304a] disabled:opacity-50">
           <Plus className="size-3.5" aria-hidden="true" />
@@ -348,7 +348,7 @@ function AccountsCard({ accounts, onChanged }: { accounts: Account[]; onChanged:
 
       {error ? <p className="mb-3 rounded-md bg-[#2b1720] px-3 py-2 text-xs text-[#ff9ca8]">{error}</p> : null}
 
-      <div className="panel-scroll min-h-0 flex-1 space-y-2 overflow-y-auto">
+      <div className="panel-scroll min-h-0 flex-1 space-y-2 lg:overflow-y-auto">
         {editingId === 'new' ? (
           <AccountEditor name={name} balance={balance} saving={saving} onName={setName} onBalance={setBalance} onSave={() => void save()} onCancel={cancel} />
         ) : null}
@@ -359,12 +359,12 @@ function AccountsCard({ accounts, onChanged }: { accounts: Account[]; onChanged:
         {accounts.map((account) => editingId === account.id ? (
           <AccountEditor key={account.id} name={name} balance={balance} saving={saving} onName={setName} onBalance={setBalance} onSave={() => void save()} onCancel={cancel} />
         ) : (
-          <div key={account.id} {...ordering.dragProps(account.id, saving || editingId !== null)} className={`flex items-center gap-2 rounded-lg px-1 py-1.5 ${ordering.over === account.id ? 'bg-[#17304a] ring-1 ring-[#78b4f4]' : ''}`}>
-            <GripVertical className="size-3.5 shrink-0 text-[#718398]" aria-hidden="true" />
-            <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#17253b] text-[#76a8ef]"><Landmark className="size-4" aria-hidden="true" /></span>
-            <span className="min-w-0 flex-1 truncate text-sm text-[#d7e0ea]" title={account.name}>{account.name}</span>
-            <span className={`ml-auto shrink-0 text-right text-sm font-medium whitespace-nowrap tabular-nums ${account.balance_cents < 0 ? 'text-[#f26868]' : 'text-[#edf3f9]'}`}>{formatCurrency(account.balance_cents)}</span>
-            <div className="grid w-15 shrink-0 grid-cols-2 gap-1">
+          <div key={account.id} {...ordering.dragProps(account.id, saving || editingId !== null)} className={`finance-summary-row flex items-center gap-2 rounded-lg px-1 py-1.5 ${ordering.over === account.id ? 'bg-[#17304a] ring-1 ring-[#78b4f4]' : ''}`}>
+            <GripVertical className="hidden size-3.5 shrink-0 text-[#718398] sm:block" aria-hidden="true" />
+            <span data-touch-drag-handle="true" title="Перетащить счёт" className="relative grid size-8 shrink-0 touch-none place-items-center rounded-lg bg-[#17253b] text-[#76a8ef]"><Landmark className="size-4" aria-hidden="true" /><GripVertical className="absolute -right-1 -bottom-1 size-3 md:hidden" aria-hidden="true" /></span>
+            <span className="finance-summary-name min-w-0 flex-1 truncate text-sm text-[#d7e0ea]" title={account.name}>{account.name}</span>
+            <span className={`finance-summary-amount ml-auto shrink-0 text-right text-sm font-medium whitespace-nowrap tabular-nums ${account.balance_cents < 0 ? 'text-[#f26868]' : 'text-[#edf3f9]'}`}>{formatCurrency(account.balance_cents)}</span>
+            <div className="finance-summary-actions grid w-15 shrink-0 grid-cols-2 gap-1">
               <SmallButton label={`Изменить счёт ${account.name}`} onClick={() => beginEdit(account)}><Pencil className="size-3.5" /></SmallButton>
               <SmallButton danger label={`Удалить счёт ${account.name}`} disabled={saving} onClick={() => void remove(account)}><Trash2 className="size-3.5" /></SmallButton>
             </div>
@@ -408,9 +408,10 @@ function useOrdering(resource: 'categories' | 'accounts', onChanged: () => Promi
       setError(failure instanceof Error ? failure.message : 'Не удалось изменить порядок');
     } finally { setPending(false); }
   };
-  const dragProps = (id: number, disabled: boolean): React.HTMLAttributes<HTMLElement> => ({
+  const dragProps = (id: number, disabled: boolean): React.HTMLAttributes<HTMLElement> & { 'data-order-id': number } => ({
+    'data-order-id': id,
     draggable: !disabled && !pending,
-    title: 'Зажмите левую кнопку мыши и перетащите строку',
+    title: 'Перетащите строку, чтобы изменить порядок',
     style: { cursor: disabled || pending ? 'default' : 'grab', opacity: dragged === id ? 0.5 : 1 },
     onDragStart: (event) => {
       if (disabled || pending || (event.target as HTMLElement).closest('button, input')) { event.preventDefault(); return; }
@@ -430,6 +431,25 @@ function useOrdering(resource: 'categories' | 'accounts', onChanged: () => Promi
       setDragged(null); setOver(null);
     },
     onDragEnd: () => { setDragged(null); setOver(null); },
+    onPointerDown: (event) => {
+      if (event.pointerType !== 'touch' || disabled || pending || !(event.target as HTMLElement).closest('[data-touch-drag-handle]')) return;
+      event.currentTarget.setPointerCapture(event.pointerId);
+      setDragged(id);
+    },
+    onPointerMove: (event) => {
+      if (event.pointerType !== 'touch' || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+      const target = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-order-id]');
+      setOver(target ? Number(target.getAttribute('data-order-id')) : null);
+    },
+    onPointerUp: (event) => {
+      if (event.pointerType !== 'touch' || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+      const target = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-order-id]');
+      const targetId = target ? Number(target.getAttribute('data-order-id')) : null;
+      event.currentTarget.releasePointerCapture(event.pointerId);
+      setDragged(null); setOver(null);
+      if (!disabled && !pending && targetId !== null && targetId !== id) void move(id, targetId);
+    },
+    onPointerCancel: () => { setDragged(null); setOver(null); },
   });
   return { pending, error, over, dragProps };
 }

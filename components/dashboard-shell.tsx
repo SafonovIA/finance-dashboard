@@ -7,6 +7,7 @@ import {
   ChevronDown,
   CircleDollarSign,
   CircleHelp,
+  LogOut,
   Settings,
   Upload,
 } from 'lucide-react';
@@ -38,7 +39,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const visibleMonths = pathname === '/' ? months.filter((month) => month.value.startsWith(`${selectedYear}-`)) : months;
 
   return (
-    <div className="dashboard-shell bg-background text-foreground md:grid md:grid-cols-[225px_minmax(0,1fr)]">
+    <div className="dashboard-shell min-w-0 bg-background text-foreground md:grid md:grid-cols-[225px_minmax(0,1fr)]">
       <aside className="dashboard-sidebar border-b border-border bg-[#091522] md:sticky md:top-0 md:flex md:flex-col md:border-r md:border-b-0">
         <div className="hidden h-[87px] shrink-0 items-center px-5 md:flex">
           <div className="grid size-9 place-items-center rounded-xl border border-[#22384f] bg-[#0d1d2d] text-[#78b4f4] shadow-[0_0_24px_rgba(67,137,216,0.12)]">
@@ -46,29 +47,34 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        <nav aria-label="Основная навигация" className="flex min-h-0 gap-1 overflow-x-auto p-2 md:flex-col md:overflow-y-auto md:px-3 md:py-3">
+        <nav aria-label="Основная навигация" className="grid min-h-0 grid-cols-3 gap-1 p-2 md:flex md:flex-col md:overflow-y-auto md:px-3 md:py-3">
           {navigation.map(({ href, label, icon: Icon }) => {
             const active = pathname === href;
             return (
               <a
                 key={href}
                 href={href}
+                aria-label={label}
                 className={cn(
-                  'flex min-w-max items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] transition-colors',
+                  'flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 text-[11px] leading-tight transition-colors md:min-h-0 md:flex-row md:justify-start md:gap-3 md:px-3 md:py-2.5 md:text-[15px]',
                   active
                     ? 'bg-[#132943] text-[#7eb9f7]'
                     : 'text-[#a2afbe] hover:bg-[#0f2032] hover:text-[#d8e5f2]',
                 )}
                 aria-current={active ? 'page' : undefined}
               >
-                <Icon className="size-4" aria-hidden="true" />
-                <span>{label}</span>
+                <Icon className="size-4 shrink-0" aria-hidden="true" />
+                <span className="max-w-full truncate md:hidden">{href === '/' ? 'Стат.' : href === '/upload' ? 'Файл' : label}</span>
+                <span className="hidden md:inline">{label}</span>
               </a>
             );
           })}
+          <a href="/help" aria-current={pathname === '/help' ? 'page' : undefined} className={cn('flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 text-[11px] leading-tight md:hidden', pathname === '/help' ? 'bg-[#132943] text-[#7eb9f7]' : 'text-[#a2afbe]')}><CircleHelp className="size-4 shrink-0" aria-hidden="true" />Помощь</a>
+          <a href="/settings" aria-label="Настройки" aria-current={pathname === '/settings' ? 'page' : undefined} className={cn('flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 text-[11px] leading-tight md:hidden', pathname === '/settings' ? 'bg-[#132943] text-[#7eb9f7]' : 'text-[#a2afbe]')}><Settings className="size-4 shrink-0" aria-hidden="true" />Настр.</a>
+          <button type="button" onClick={async () => { await requestJson<void>('/api/auth/logout', { method: 'POST' }); window.location.assign('/login'); }} className="flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 text-[11px] leading-tight text-[#a2afbe] md:hidden"><LogOut className="size-4 shrink-0" aria-hidden="true" />Выйти</button>
         </nav>
 
-        <div className="mt-auto shrink-0 p-3">
+        <div className="mt-auto hidden shrink-0 p-3 md:block">
           <a
             href="/help"
             aria-current={pathname === '/help' ? 'page' : undefined}
@@ -90,12 +96,12 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main className="min-w-0">
-        <header className="grid min-h-[87px] grid-cols-[1fr_auto_1fr] items-center border-b border-border px-5 sm:px-8">
-          <span aria-hidden="true" />
+        <header className="flex min-h-[87px] flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3 sm:px-8 md:grid md:grid-cols-[1fr_auto_1fr] md:py-0">
+          <span aria-hidden="true" className="hidden md:block" />
           <h1 className="text-sm font-semibold tracking-tight text-[#f2f6fb] sm:text-base">
             {titles[pathname] ?? 'Статистика'}
           </h1>
-          <div className="flex flex-wrap justify-end gap-2">
+          <div className="order-2 flex min-w-0 flex-wrap justify-end gap-2 md:order-none">
             {pathname === '/' && <label className="text-xs text-[#8b9bad]">
               <span className="sr-only">Выберите год</span>
               <select value={selectedYear} disabled={loading} onChange={(event) => {
@@ -132,7 +138,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
             ) : null}
           </div>
         </header>
-        <div className="mx-auto w-full max-w-[1357px] p-5 sm:p-8">{children}</div>
+        <div className="mx-auto w-full max-w-[1357px] min-w-0 p-3 sm:p-8">{children}</div>
       </main>
     </div>
   );

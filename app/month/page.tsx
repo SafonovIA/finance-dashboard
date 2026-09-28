@@ -126,7 +126,7 @@ export default function MonthPage() {
           className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#66313a] bg-[#25151d] px-3 text-sm font-medium text-[#ff9ca8] transition-colors hover:bg-[#321923] disabled:cursor-wait disabled:opacity-50"
         >
           <Trash2 className="size-4" aria-hidden="true" />
-          {deletingMonth ? 'Удаляем…' : 'Удалить данные за месяц'}
+          {deletingMonth ? 'Удаляем…' : <><span className="sm:hidden">Удалить месяц</span><span className="hidden sm:inline">Удалить данные за месяц</span></>}
         </button>
       </div>
       <TransactionsTable key={`${selectedMonth}-expense`} title="Расходы" rows={expenses} accounts={accounts} categories={categories.expense} tone="expense" onUpdated={handleUpdated} onDeleted={handleDeleted} />
@@ -314,11 +314,31 @@ function TransactionsTable({
 
   return (
     <section className="rounded-xl border border-[#15283b] bg-card p-4 sm:p-5">
-      <div className="mb-3 flex items-center justify-between gap-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className={`text-sm font-semibold ${toneClass}`}>{title}</h2>
-        <span className="text-[13px] text-[#718398]">Показано {filteredRows.length} из {rows.length} · изменения сохраняются при выходе из строки</span>
+        <span className="text-[13px] text-[#718398]">Показано {filteredRows.length} из {rows.length}<span className="hidden sm:inline"> · изменения сохраняются при выходе из строки</span></span>
       </div>
       {error ? <p role="alert" className="mb-3 rounded-md bg-[#2b1720] px-3 py-2 text-xs text-[#ff9ca8]">{error}{editingId !== null && <button type="button" className="ml-2 underline" onClick={() => { const row = rows.find((item) => item.id === editingId); if (row) void save(row); }}>Повторить</button>}</p> : null}
+      <div className="month-mobile-controls mb-4 space-y-3 md:hidden">
+        <div className="grid grid-cols-[minmax(0,1fr)_2.5rem] gap-2">
+          <label htmlFor={`${tone}-mobile-sort`} className="col-span-2 text-xs text-[#91a0b1]">Сортировка</label>
+          <select id={`${tone}-mobile-sort`} value={sortKey} onChange={(event) => setSortKey(event.target.value as SortKey)} className="min-w-0 w-full rounded-lg border border-[#24405d] bg-[#091522] px-2 py-2 text-sm">
+            {tableColumns.map((column) => <option key={column.key} value={column.key}>{column.label}</option>)}
+          </select>
+          <button type="button" onClick={() => setSortDirection((current) => current === 'asc' ? 'desc' : 'asc')} aria-label={sortDirection === 'asc' ? 'По убыванию' : 'По возрастанию'} className="grid size-10 shrink-0 place-items-center rounded-lg border border-[#24405d] text-[#91b9df]"><SortIcon active direction={sortDirection} /></button>
+        </div>
+        <details className="rounded-lg border border-[#24405d] bg-[#0a1725] p-3">
+          <summary className="cursor-pointer text-sm text-[#91b9df]">Фильтры{hasActiveFilters ? ' · активны' : ''}</summary>
+          <div className="mt-3 grid gap-3">
+            <label className="grid gap-1 text-xs text-[#91a0b1]">Дата<input type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} className="editor-control" /></label>
+            <div className="grid gap-1 text-xs text-[#91a0b1]"><span>Категория</span><CategorySelect categories={categories} value={categoryFilter} onChange={setCategoryFilter} all label="Фильтр по категории" /></div>
+            <label className="grid gap-1 text-xs text-[#91a0b1]">Комментарий<input type="search" value={commentFilter} onChange={(event) => setCommentFilter(event.target.value)} placeholder="Найти комментарий" className="editor-control" /></label>
+            <label className="grid gap-1 text-xs text-[#91a0b1]">Источник<select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="editor-control"><option value="">Все источники</option>{sourceOptions.map((source) => <option key={source} value={source}>{source}</option>)}</select></label>
+            <button type="button" disabled={!hasActiveFilters} onClick={clearFilters} className="justify-self-start text-sm text-[#91b9df] disabled:opacity-50">Сбросить фильтры</button>
+          </div>
+        </details>
+      </div>
+      <div className="month-table-view">
       <Table className="month-table min-w-[1035px] table-fixed text-[14px]">
         <colgroup>
           <col style={{ width: '17%' }} />
@@ -390,21 +410,21 @@ function TransactionsTable({
                 if (event.key === 'Enter') { event.preventDefault(); void save(transaction); }
                 if (event.key === 'Escape') { event.preventDefault(); cancelEditing(); }
               }}>
-                <TableCell className="h-10 px-2 py-1.5 text-[#bcc8d5]">
+                <TableCell data-label="Дата" className="h-10 px-2 py-1.5 text-[#bcc8d5]">
                   {editing ? <EditorInput aria-label="Дата" type="date" disabled={saving} value={values.occurred_on} onChange={(value) => updateValues({ ...values, occurred_on: value })} /> : <FieldButton label="Изменить дату" onClick={() => void startEditing(transaction, 'occurred_on')}>{formatDate(transaction.occurred_on)}</FieldButton>}
                 </TableCell>
-                <TableCell className="h-10 px-2 py-1.5 font-medium tabular-nums text-[#edf3f9]">
+                <TableCell data-label="Сумма" className="h-10 px-2 py-1.5 font-medium tabular-nums text-[#edf3f9]">
                   {editing ? <EditorInput aria-label="Сумма" type="number" step="0.01" min="0.01" disabled={saving} value={values.amount} onChange={(value) => updateValues({ ...values, amount: value })} /> : <FieldButton label="Изменить сумму" onClick={() => void startEditing(transaction, 'amount')}>{`${transaction.kind === 'refund' ? '−' : ''}${formatCurrency(transaction.amount_cents)}`}</FieldButton>}
                 </TableCell>
-                <TableCell className="h-10 px-2 py-1.5 text-[#bcc8d5]">
+                <TableCell data-label="Категория" className="h-10 px-2 py-1.5 text-[#bcc8d5]">
                   {editing ? (
                     <CategorySelect defaultOpen={initialField === 'category'} categories={categories} value={values.category} onChange={(category) => { const next = { ...values, category }; updateValues(next); void save(transaction, next); }} disabled={saving} />
                   ) : <FieldButton label="Изменить категорию" onClick={() => void startEditing(transaction, 'category')}><CategoryIcon icon={categories.find((category) => category.name === transaction.category)?.icon} color={categories.find((category) => category.name === transaction.category)?.icon_color} />{transaction.category}</FieldButton>}
                 </TableCell>
-                <TableCell className="h-10 max-w-[299px] px-2 py-1.5 text-[#bcc8d5]">
+                <TableCell data-label="Комментарий" className="h-10 max-w-[299px] px-2 py-1.5 text-[#bcc8d5]">
                   {editing ? <EditorInput aria-label="Комментарий" disabled={saving} value={values.comment} onChange={(value) => updateValues({ ...values, comment: value })} /> : <FieldButton label="Изменить комментарий" onClick={() => void startEditing(transaction, 'comment')}>{transaction.comment ?? '—'}</FieldButton>}
                 </TableCell>
-                <TableCell className="h-10 max-w-[207px] px-2 py-1.5 text-[#bcc8d5]">
+                <TableCell data-label="Источник" className="h-10 max-w-[207px] px-2 py-1.5 text-[#bcc8d5]">
                   {editing ? (
                     <Select modal={false} defaultOpen={initialField === 'account_id'} value={values.account_id} onValueChange={(account_id) => { if (account_id !== null) { const next = { ...values, account_id }; updateValues(next); void save(transaction, next); } }} disabled={saving}>
                       <SelectTrigger aria-label="Источник" className="w-full"><span className="truncate">{accounts.find((account) => String(account.id) === values.account_id)?.name}</span></SelectTrigger>
@@ -412,7 +432,7 @@ function TransactionsTable({
                     </Select>
                   ) : <FieldButton label="Изменить источник" onClick={() => void startEditing(transaction, 'account_id')}>{transaction.source}</FieldButton>}
                 </TableCell>
-                <TableCell className="h-10 w-24 px-2 py-1.5 text-right">
+                <TableCell data-label="Действия" className="h-10 w-24 px-2 py-1.5 text-right">
                   {editing ? (
                     <div className="flex justify-end gap-1">
                       <IconButton label="Отменить" disabled={saving} onClick={cancelEditing}><X className="size-3.5" /></IconButton>
@@ -428,6 +448,7 @@ function TransactionsTable({
           })}
         </TableBody>
       </Table>
+      </div>
       <div className={`mt-3 flex items-center justify-between border-t border-[#17293c] px-2 pt-4 text-xs font-semibold ${toneClass}`}>
         <span>{hasActiveFilters ? 'Итого по фильтру' : (tone === 'expense' ? 'Итого расходов' : 'Итого доходов')}</span>
         <span className="tabular-nums">{formatCurrency(Math.max(0, total))}</span>

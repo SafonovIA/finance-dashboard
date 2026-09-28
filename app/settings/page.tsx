@@ -72,7 +72,7 @@ export default function SettingsPage() {
       setPasswordSaving(false);
     }
   };
-  return <div className="space-y-5"><section className="rounded-xl border border-[#15283b] bg-card p-6">
+  return <div className="space-y-5"><section className="rounded-xl border border-[#15283b] bg-card p-4 sm:p-6">
     <fieldset>
       <legend className="text-base font-semibold">Размер таблиц и текста</legend>
       <p className="my-3 text-sm text-[#91a2b5]">Размер применяется ко всему приложению и сохраняется для вашего аккаунта.</p>
@@ -84,7 +84,7 @@ export default function SettingsPage() {
       ))}</div>
       {sizeError && <output className="mt-3 block text-sm text-[#f08e99]">{sizeError}</output>}
     </fieldset>
-  </section><section className="rounded-xl border border-[#15283b] bg-card p-6">
+  </section><section className="rounded-xl border border-[#15283b] bg-card p-4 sm:p-6">
     <h2 className="text-base font-semibold">Аккаунт</h2>
     <p className="my-3 text-sm text-[#91a2b5]">{savedEmail ? `Email для входа: ${emailVerified ? 'подтверждён' : 'не подтверждён'}` : 'Привяжите email, чтобы входить по нему вместо прежнего имени. Адрес начнёт действовать после подтверждения.'}</p>
     <form onSubmit={(event) => void saveEmail(event)} className="flex max-w-lg flex-col gap-2">
@@ -94,7 +94,7 @@ export default function SettingsPage() {
     </form>
     {savedEmail && !emailVerified && <button type="button" disabled={saving} onClick={() => void resendVerification()} className="mt-3 text-sm text-[#91b9df] disabled:opacity-50">Отправить письмо повторно на текущий email</button>}
     {message && <output className="mt-3 block text-sm text-[#91b9df]">{message}</output>}
-  </section><section className="rounded-xl border border-[#15283b] bg-card p-6">
+  </section><section className="rounded-xl border border-[#15283b] bg-card p-4 sm:p-6">
     <h2 className="text-base font-semibold">Изменить пароль</h2>
     <p className="my-3 text-sm text-[#91a2b5]">После изменения потребуется войти снова на всех устройствах.</p>
     <form onSubmit={(event) => void changePassword(event)} className="flex max-w-lg flex-col gap-2">
